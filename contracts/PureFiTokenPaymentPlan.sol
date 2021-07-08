@@ -3,13 +3,11 @@ pragma solidity ^0.8.6;
 
 import "../openzeppelin-contracts-master/contracts/token/ERC20/IERC20.sol";
 import "../openzeppelin-contracts-master/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../openzeppelin-contracts-master/contracts/utils/math/SafeMath.sol";
 import "../openzeppelin-contracts-master/contracts/access/Ownable.sol";
 
 
 contract PureFiTokenPaymentPlan is Ownable {
 
-  using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
   struct PaymentPlan{
@@ -81,6 +79,7 @@ contract PureFiTokenPaymentPlan is Ownable {
     require(_amount <= available, "Amount exeeded current withdrawable amount");
     require(available > 0, "Nothing to withdraw");
     vestedTokens[msg.sender].withdrawnAmount += _amount;
+    totalVestedAmount -= _amount;
     token.safeTransfer(msg.sender, _amount);
     emit Withdrawal(msg.sender, _amount);
   }
