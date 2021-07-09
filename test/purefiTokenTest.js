@@ -1,4 +1,4 @@
-const { time, expectRevert } = require('openzeppelin-test-helpers');
+const { time, expectRevert } = require('@openzeppelin/test-helpers');
 const bigDecimal = require('js-big-decimal');
 const web3 = require("web3");
 const BN = web3.utils.BN;
