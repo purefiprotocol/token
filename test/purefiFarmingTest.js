@@ -12,6 +12,7 @@ const PureFiToken = artifacts.require('PureFiToken');
 const PProxy = artifacts.require('PProxy');
 const PProxyAdmin = artifacts.require('PProxyAdmin');
 const PureFiFarming = artifacts.require('PureFiFarming');
+const PureFiFixedDatePaymentPlan = artifacts.require('PureFiFixedDatePaymentPlan');
 
 function toBN(number) {
     return web3.utils.toBN(number);
@@ -215,6 +216,60 @@ contract('PureFiFarming', (accounts) => {
         // }
         
     });
+
+    it('Claim & Stake test', async () => {
+
+        let paymentPlanFD;
+        await PureFiFixedDatePaymentPlan.new().then(instance => paymentPlanFD = instance);
+        await paymentPlanFD.initialize.sendTransaction(pureFiToken.address);
+
+        await paymentPlanFD.setFarmingContract.sendTransaction(farming.address,toBN(0));
+
+        //add payment plan with 2 dates:
+        let currentTime = await time.latest();
+        await time.advanceBlock();
+        let unlockDates = [toBN(0), currentTime.add(toBN(86400))];
+        let unlockPercents = [toBN(50*100),toBN(50*100)];
+        
+        console.log("Adding payment plan:");
+        for( let i =0;i<unlockDates.length;i++){
+            console.log(i, ": ",unlockDates[i].toString()," - ",unlockPercents[i].toString());
+        }
+
+        let addPlanRes = await paymentPlanFD.addPaymentPlan.sendTransaction(unlockDates,unlockPercents);
+
+        await pureFiToken.transfer.sendTransaction(paymentPlanFD.address,toBN(100000).mul(decimals));
+        // vestTokens(uint8 _paymentPlan, uint64 _startDate, uint256 _amount, address _beneficiary)
+        let totalVested = toBN(100).mul(decimals);
+        let addVest = await paymentPlanFD.vestTokens.sendTransaction(toBN(0),currentTime.sub(toBN(86400)),totalVested,accounts[0]);
+        printEvents(addVest, "addVest");
+
+         //check available
+         {
+            let withdrawable = await paymentPlanFD.withdrawableAmount.call(accounts[0]);
+            let nextUnlockDate = withdrawable[0].toNumber();
+            let availableAmount = withdrawable[1];
+            console.log(nextUnlockDate," ", availableAmount.toString());
+            expect(availableAmount).to.be.eq.BN(toBN(50).mul(decimals));
+            
+
+            {
+                let balanceBefore = await pureFiToken.balanceOf(accounts[0]);
+                await paymentPlanFD.withdrawAndStake(availableAmount, {from: accounts[0]})
+                let balanceAfter = await pureFiToken.balanceOf(accounts[0]);
+                expect(balanceAfter).to.be.eq.BN(balanceBefore);
+
+                let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
+                let index=0;
+                console.log("amount: ", data[index++].toString());
+                console.log("withdrawableReward: ", data[index++].toString());
+                expect(data[0]).to.be.eq.BN(availableAmount);
+            }
+        }
+        
+    });
+
+    
 
     // it('add Vested Tokens', async () => {
     //     await pureFiToken.transfer.sendTransaction(paymentPlan.address,toBN(100000).mul(decimals));

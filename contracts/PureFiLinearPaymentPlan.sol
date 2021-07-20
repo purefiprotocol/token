@@ -3,7 +3,7 @@ pragma solidity ^0.8.6;
 
 import "./PureFiPaymentPlan.sol";
 
-contract PureFiTokenLinearPaymentPlan is PureFiPaymentPlan {
+contract PureFiLinearPaymentPlan is PureFiPaymentPlan {
 
   struct PaymentPlan{
     uint64 cliff;

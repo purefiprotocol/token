@@ -5,6 +5,7 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/token/ERC20/utils
 import "../openzeppelin-contracts-upgradeable-master/contracts/access/AccessControlUpgradeable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/proxy/utils/Initializable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/security/PausableUpgradeable.sol";
+import "./interfaces/IPureFiFarming.sol";
 
 interface ILiquidityMigrator {
     function migrate(IERC20Upgradeable token) external returns (IERC20Upgradeable);
@@ -12,7 +13,7 @@ interface ILiquidityMigrator {
 
 // Derived from Sushi Farming contract
 
-contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgradeable {
+contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgradeable, IPureFiFarming {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     //ACL
@@ -207,9 +208,14 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function deposit(uint16 _pid, uint256 _amount) public whenNotPaused {
+    function deposit(uint16 _pid, uint256 _amount) public override whenNotPaused {
+        depositTo(_pid, _amount, msg.sender);
+    }
+
+    // Deposit LP tokens to PureFiFarming for Token allocation.
+    function depositTo(uint16 _pid, uint256 _amount, address _beneficiary) public override whenNotPaused {
         PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][msg.sender];
+        UserInfo storage user = userInfo[_pid][_beneficiary];
         updatePool(_pid);
         if (user.amount > 0) {
             user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
@@ -220,11 +226,11 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             pool.totalDeposited += _amount;
         }
         user.rewardDebt = user.amount * pool.accTokenPerShare / 1e12;
-        emit Deposit(msg.sender, _pid, _amount);
+        emit Deposit(_beneficiary, _pid, _amount);
     }
 
     // Withdraw LP tokens from PureFiFarming.
-    function withdraw(uint16 _pid, uint256 _amount) public whenNotPaused {
+    function withdraw(uint16 _pid, uint256 _amount) public override whenNotPaused {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -240,7 +246,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     // Claim rewarded tokens from PureFiFarming.
-    function claimReward(uint16 _pid) public whenNotPaused {
+    function claimReward(uint16 _pid) public override whenNotPaused {
         require(block.timestamp >= noRewardClaimsUntil, "Claiming reward is not available yet");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -256,7 +262,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     // withdraw all liquidity and claim all pending reward
-    function exit(uint16 _pid) public whenNotPaused {
+    function exit(uint16 _pid) public override whenNotPaused {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
@@ -279,7 +285,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
-    function emergencyWithdraw(uint16 _pid) public whenNotPaused {
+    function emergencyWithdraw(uint16 _pid) public override whenNotPaused {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         uint256 amount = user.amount;
@@ -292,11 +298,11 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     //************* VIEW FUNCTIONS ********************************
 
-    function getPoolLength() external view returns (uint256) {
+    function getPoolLength() external override view returns (uint256) {
         return poolInfo.length;
     }
 
-    function getPool(uint16 _index) external view returns (address, uint256, uint64, uint64, uint64, uint256, uint256) {
+    function getPool(uint16 _index) external override view returns (address, uint256, uint64, uint64, uint64, uint256, uint256) {
         require (_index < poolInfo.length, "index incorrect");
         PoolInfo memory pool = poolInfo[_index];
         return (address(pool.lpToken), pool.allocPoint, pool.startBlock, pool.endBlock, pool.lastRewardBlock, pool.accTokenPerShare, pool.totalDeposited);
@@ -315,7 +321,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     // View function to see pending Tokens on frontend.
-    function getUserInfo(uint16 _pid, address _user) external view returns (uint256, uint256) {
+    function getUserInfo(uint16 _pid, address _user) external override view returns (uint256, uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accTokenPerShare = pool.accTokenPerShare;

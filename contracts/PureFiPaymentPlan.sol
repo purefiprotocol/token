@@ -6,6 +6,7 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/token/ERC20/utils
 import "../openzeppelin-contracts-upgradeable-master/contracts/access/OwnableUpgradeable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/proxy/utils/Initializable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/security/PausableUpgradeable.sol";
+import "./interfaces/IPureFiFarming.sol";
 
 
  abstract contract PureFiPaymentPlan is Initializable, OwnableUpgradeable, PausableUpgradeable {
@@ -23,6 +24,8 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/security/Pausable
 
   IERC20Upgradeable public token;
   uint256 public totalVestedAmount; // total amount of vested tokens under this contract control.
+  address public farmingContract;
+  uint8 public farmingContractPool;
 
   event Withdrawal(address indexed who, uint256 amount);
   event PaymentPlanAdded(uint256 index);
@@ -46,6 +49,11 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/security/Pausable
       super._unpause();
   }
 
+  function setFarmingContract(address _farmingContract, uint8 _farmingContractPool) onlyOwner public {
+    farmingContract = _farmingContract;
+    farmingContractPool = _farmingContractPool;
+  }
+
   function vestTokens(uint8 _paymentPlan, uint64 _startDate, uint256 _amount, address _beneficiary) public onlyOwner whenNotPaused{
     require(vestedTokens[_beneficiary].totalAmount == 0, "This address already has vested tokens");
     require(_isPaymentPlanExists(_paymentPlan), "Incorrect payment plan index");
@@ -57,15 +65,27 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/security/Pausable
   }
 
   function withdraw(uint256 _amount) public whenNotPaused {
+    _prepareWithdraw(_amount);
+    token.safeTransfer(msg.sender, _amount);
+  }
+
+  function withdrawAndStake(uint256 _amount) public whenNotPaused{
+    require(farmingContract != address(0),"Farming contract is not defined");
+    _prepareWithdraw(_amount);
+    //stake on farming contract instead of withdrawal
+    token.safeApprove(farmingContract, _amount);
+    IPureFiFarming(farmingContract).depositTo(farmingContractPool, _amount, msg.sender);
+  }
+
+  function _prepareWithdraw(uint256 _amount) private {
     require(vestedTokens[msg.sender].totalAmount > 0,"No tokens vested for this address");
     (, uint256 available) = withdrawableAmount(msg.sender);
     require(_amount <= available, "Amount exeeded current withdrawable amount");
     require(available > 0, "Nothing to withdraw");
     vestedTokens[msg.sender].withdrawnAmount += _amount;
     totalVestedAmount -= _amount;
-    token.safeTransfer(msg.sender, _amount);
     emit Withdrawal(msg.sender, _amount);
-  }
+  } 
   
   /**
   * @param _beneficiary - address of the user who has his/her tokens vested on the contract
