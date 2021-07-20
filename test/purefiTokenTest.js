@@ -12,7 +12,7 @@ chai.use(require('chai-match'));
 
 
 const PureFiToken = artifacts.require('PureFiToken');
-const PureFiTokenPaymentPlan = artifacts.require('PureFiTokenPaymentPlan');
+const PureFiFixedDatePaymentPlan = artifacts.require('PureFiFixedDatePaymentPlan');
 
 function toBN(number) {
     return web3.utils.toBN(number);
@@ -48,7 +48,8 @@ contract('PureFiToken', (accounts) => {
     before(async () => {
         await PureFiToken.deployed().then(instance => pureFiToken = instance);
         console.log("startDate=",startDate);
-        await PureFiTokenPaymentPlan.new(pureFiToken.address, toBN(startDate)).then(instance => paymentPlan = instance);
+        await PureFiFixedDatePaymentPlan.new().then(instance => paymentPlan = instance);
+        await paymentPlan.initialize.sendTransaction(pureFiToken.address);
 
         
     });

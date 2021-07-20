@@ -88,7 +88,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         noRewardClaimsUntil = _noRewardClaimsUntil;
     }
 
-    function version() public view returns (uint32){
+    function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
         return uint32(1001000);
     }
