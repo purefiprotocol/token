@@ -67,8 +67,24 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/security/Pausable
     emit Withdrawal(msg.sender, _amount);
   }
   
+  /**
+  * @param _beneficiary - address of the user who has his/her tokens vested on the contract
+  * returns:
+  * 0. next payout date for the user (0 if tokens are fully paid out)
+  * 1. amount of tokens that user can withdraw as of now
+  */
   function withdrawableAmount(address _beneficiary) public virtual view returns (uint64, uint256);
 
+  /**
+  * @param _beneficiary - address of the user who has his/her tokens vested on the contract
+  * returns:
+  * 0. payment plan ID
+  * 1. vesting start date. no claims before start date allowed
+  * 2. next unlock date. the date user can claim more tokens
+  * 3. total amount of tokens vested
+  * 4. withdrawn tokens amount (already claimed tokens, essentially) 
+  * 5. amount of tokens that user can withdraw as of now
+  */
   function vestingData(address _beneficiary) public view returns (uint8, uint64, uint64, uint256, uint256, uint256) {
     (uint64 nextUnlockDate, uint256 available) = withdrawableAmount(_beneficiary);
     return (vestedTokens[_beneficiary].paymentPlan, vestedTokens[_beneficiary].startDate, nextUnlockDate, vestedTokens[_beneficiary].totalAmount, vestedTokens[_beneficiary].withdrawnAmount, available);

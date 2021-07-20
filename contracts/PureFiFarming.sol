@@ -45,7 +45,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         uint64 endBlock; // farming endBlock
         uint64 lastRewardBlock;  // Last block number that Tokens distribution occurs.
         uint256 accTokenPerShare; // Accumulated Tokens per share, times 1e12. See below.
-        uint256 totalDeposited;
+        uint256 totalDeposited; //total tokens deposited in address of a pool
     }
 
     // The Token TOKEN
