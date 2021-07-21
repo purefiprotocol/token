@@ -8,12 +8,10 @@ const assert = chai.assert;
 chai.use(require('bn-chai')(BN));
 chai.use(require('chai-match'));
 
-
-
-
 const PureFiToken = artifacts.require('PureFiToken');
 const PureFiFixedDatePaymentPlan = artifacts.require('PureFiFixedDatePaymentPlan');
 const PureFiLinearPaymentPlan = artifacts.require('PureFiLinearPaymentPlan');
+const PureFiBotProtection = artifacts.require('PureFiBotProtection');
 
 function toBN(number) {
     return web3.utils.toBN(number);
@@ -41,6 +39,7 @@ contract('PureFiToken', (accounts) => {
     console.log("Test: Admin: "+admin);
 
     let pureFiToken;
+    let botProtection;
     let paymentPlanFD;
     let paymentPlanLinear;
     // const startDate = 1627383600; // Jul 27 11:00 UTC
@@ -49,6 +48,8 @@ contract('PureFiToken', (accounts) => {
 
     before(async () => {
         await PureFiToken.deployed().then(instance => pureFiToken = instance);
+        await PureFiBotProtection.deployed().then(instance => botProtection = instance);
+        
         console.log("startDate=",startDate);
         await PureFiFixedDatePaymentPlan.new().then(instance => paymentPlanFD = instance);
         await paymentPlanFD.initialize.sendTransaction(pureFiToken.address);
@@ -60,11 +61,57 @@ contract('PureFiToken', (accounts) => {
     });
 
     it('PureFi Token', async () => {
-
         let balance = await pureFiToken.balanceOf.call(admin);
         console.log("balance",balance.toString());
         expect(balance).to.be.eq.BN(toBN(100000000).mul(decimals));
   
+    });
+
+    it('Check bot protection', async () => {
+        let botAddress = accounts[1];
+        let botWhitelistedAddress = accounts[2];
+        let someBalance = toBN(10).mul(decimals);
+        await pureFiToken.transfer.sendTransaction(botAddress, someBalance, {from:accounts[0]});
+        await pureFiToken.transfer.sendTransaction(botWhitelistedAddress, someBalance, {from:accounts[0]});
+        //enable bot protection for 10 blocks and 15 sec
+        await botProtection.setBotLaunchpad.sendTransaction(accounts[0]);
+        await pureFiToken.setBotProtector.sendTransaction(botProtection.address);
+        await botProtection.prepareBotProtection.sendTransaction(toBN(10),toBN(15));
+        //whitelist bot address
+        await botProtection.setBotWhitelist.sendTransaction(botWhitelistedAddress,true);
+        //successful transaction from whitelisted address
+        {
+            let balanceBefore = await pureFiToken.balanceOf(botWhitelistedAddress);
+            await pureFiToken.transfer(accounts[0],someBalance, {from: botWhitelistedAddress})
+            let balanceAfter = await pureFiToken.balanceOf(botWhitelistedAddress);
+            expect(balanceBefore.sub(balanceAfter)).to.be.eq.BN(someBalance);
+        }
+        //not whitelisted addresses transactions are reverted
+        {
+            let balanceBefore = await pureFiToken.balanceOf(botAddress);
+            await expectRevert(
+                pureFiToken.transfer(accounts[0], someBalance, {from: botAddress}),
+                'revert'
+            );
+            let balanceAfter = await pureFiToken.balanceOf(botAddress);
+            expect(balanceAfter).to.be.eq.BN(balanceBefore);
+        }
+        //expire protection
+        await time.increase(time.duration.seconds(30));
+        let currentBlock = await time.latestBlock();
+        for(let i=0;i<10;i++){
+            await time.advanceBlock();
+        }
+        let shifedBlock = await time.latestBlock();
+        console.log("Shifting block: ",currentBlock.toString()," => ",shifedBlock.toString());
+        //check bot transaction is successful after protection expired
+        {
+            let balanceBefore = await pureFiToken.balanceOf(botAddress);
+            await pureFiToken.transfer(accounts[0],someBalance, {from: botAddress})
+            let balanceAfter = await pureFiToken.balanceOf(botAddress);
+            expect(balanceBefore.sub(balanceAfter)).to.be.eq.BN(someBalance);
+        }
+
     });
 
     it('add Fixed Date payment plan', async () => {
@@ -119,10 +166,15 @@ contract('PureFiToken', (accounts) => {
     });
 
     it('test Fixed Date payment plan', async () => {
+        let vestingStartTime = await time.latest();
+        vestingStartTime = vestingStartTime.add(toBN(30));//sec
+        console.log("time:", (await time.latest()).toString());
+        console.log("vtime:",vestingStartTime.toString());
+
         await pureFiToken.transfer.sendTransaction(paymentPlanFD.address,toBN(100000).mul(decimals));
         // vestTokens(uint8 _paymentPlan, uint64 _startDate, uint256 _amount, address _beneficiary)
         let totalVested = toBN(100).mul(decimals);
-        let addVest = await paymentPlanFD.vestTokens.sendTransaction(toBN(0),startDate,totalVested,accounts[0]);
+        let addVest = await paymentPlanFD.vestTokens.sendTransaction(toBN(0),vestingStartTime,totalVested,accounts[0]);
         printEvents(addVest, "addVest");
     
         //before start
