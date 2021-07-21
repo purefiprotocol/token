@@ -114,6 +114,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             expect(data[0]).to.be.eq.BN(depositBalance);
             expect(data[1]).to.be.eq.BN(toBN(0));
+            expect(data[2]).to.be.eq.BN(toBN(0));
         }
         
         await farming.withdraw.sendTransaction(toBN(0),depositBalance);
@@ -122,6 +123,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             expect(data[0]).to.be.eq.BN(toBN(0));
             expect(data[1]).to.be.eq.BN(toBN(0));
+            expect(data[2]).to.be.eq.BN(toBN(0));
         }
         
     });
@@ -137,6 +139,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             expect(data[0]).to.be.eq.BN(depositBalance);
             expect(data[1]).to.be.eq.BN(toBN(0));
+            expect(data[2]).to.be.eq.BN(toBN(0));
         }
         
         //shift some blocks
@@ -146,6 +149,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             let index=0;
             console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
             console.log("withdrawableReward: ", data[index++].toString());
         }
         await advanceBlock(20);
@@ -153,6 +157,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             let index=0;
             console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
             console.log("withdrawableReward: ", data[index++].toString());
         }
 
@@ -167,6 +172,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             let index=0;
             console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
             console.log("withdrawableReward: ", data[index++].toString());
         }
 
@@ -176,6 +182,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             let index=0;
             console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
             console.log("withdrawableReward: ", data[index++].toString());
         }
         await advanceBlock(1);
@@ -183,6 +190,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             let index=0;
             console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
             console.log("withdrawableReward: ", data[index++].toString());
         }
         // await farming.deposit.sendTransaction(toBN(0),depositBalance);
@@ -192,6 +200,7 @@ contract('PureFiFarming', (accounts) => {
             let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
             let index=0;
             console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
             console.log("withdrawableReward: ", data[index++].toString());
         }
         {
@@ -262,6 +271,7 @@ contract('PureFiFarming', (accounts) => {
                 let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
                 let index=0;
                 console.log("amount: ", data[index++].toString());
+                console.log("totalRewardClaimed: ", data[index++].toString());
                 console.log("withdrawableReward: ", data[index++].toString());
                 expect(data[0]).to.be.eq.BN(availableAmount);
             }

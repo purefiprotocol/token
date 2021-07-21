@@ -11,5 +11,5 @@ interface IPureFiFarming{
     function emergencyWithdraw(uint16 _pid) external;
     function getPoolLength() external view returns (uint256);
     function getPool(uint16 _index) external view returns (address, uint256, uint64, uint64, uint64, uint256, uint256);
-    function getUserInfo(uint16 _pid, address _user) external view returns (uint256, uint256);
+    function getUserInfo(uint16 _pid, address _user) external view returns (uint256, uint256, uint256);
 }

@@ -24,6 +24,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     struct UserInfo {
         uint256 amount;     // How many LP tokens the user has provided.
         uint256 pendingReward; //how many tokens user was rewarded with, pending to withdraw
+        uint256 totalRewarded; //total amount of tokens rewarded to user
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
         // We do some fancy math here. Basically, any point in time, the amount of Tokens
@@ -254,6 +255,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
         user.rewardDebt = user.amount * pool.accTokenPerShare / 1e12;
         if(user.pendingReward > 0){
+            user.totalRewarded += user.pendingReward;
             uint256 pending = user.pendingReward;
             user.pendingReward = 0;
             _safeTokenTransfer(msg.sender, pending);
@@ -276,6 +278,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         }
         if(user.pendingReward > 0){
             require(block.timestamp >= noRewardClaimsUntil, "Claiming reward is not available yet");
+            user.totalRewarded += user.pendingReward;
             uint256 pending = user.pendingReward;
             user.pendingReward = 0;
             _safeTokenTransfer(msg.sender,pending);
@@ -321,7 +324,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     // View function to see pending Tokens on frontend.
-    function getUserInfo(uint16 _pid, address _user) external override view returns (uint256, uint256) {
+    function getUserInfo(uint16 _pid, address _user) external override view returns (uint256, uint256, uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accTokenPerShare = pool.accTokenPerShare;
@@ -330,7 +333,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             uint256 amountRewardedPerPool = totalAllocPoint > 0 ? (multiplier * tokensFarmedPerBlock * pool.allocPoint / totalAllocPoint) : 0;
             accTokenPerShare += amountRewardedPerPool * 1e12 / pool.totalDeposited;
         }
-        return (userInfo[_pid][_user].amount, user.pendingReward + user.amount * accTokenPerShare / 1e12 - user.rewardDebt);
+        return (user.amount, user.totalRewarded, user.pendingReward + user.amount * accTokenPerShare / 1e12 - user.rewardDebt);
     }
 
     //************* INTERNAL FUNCTIONS ********************************
