@@ -50,6 +50,15 @@ module.exports = {
       gasPrice: 10000000000
       // skipDryRun: false
     },
+    bsctest: {
+      provider: () => new HDWalletProvider(mnemonic, 'https://data-seed-prebsc-1-s1.binance.org:8545'),
+      network_id: 97,
+      // confirmations: 10,
+      timeoutBlocks: 200,
+      gas: 10000000,
+      gasPrice: 10000000000
+      // skipDryRun: false
+    }
   },
 
   compilers: {
