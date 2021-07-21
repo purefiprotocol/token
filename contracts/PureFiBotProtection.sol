@@ -11,7 +11,6 @@ contract PureFiBotProtection is Context, Ownable, IBotProtectedV1Token, IBotProt
 
     // --==[ ADDRESSES ]==--
     address public botLaunchpad;
-    address public botProtectionOperator;
     address public tokenProtected;//erc20 token protected by this contract
 
     // --==[ PROTECTION ]==--
@@ -75,12 +74,6 @@ contract PureFiBotProtection is Context, Ownable, IBotProtectedV1Token, IBotProt
         emit BotProtectionLaunchpadChanged(launchpad);
     }
 
-    function setBotProtectionOperator(address operator) external onlyOwner {
-        require(botProtectionOperator != operator, "PureFiBotProtection: operator is the same");
-        botProtectionOperator = operator;
-        emit BotProtectionOperatorChanged(operator);
-    }
-
     function setBotWhitelist(address account, bool isWhitelisted) external onlyOwner {
         botWhitelist[account] = isWhitelisted;
         if (isWhitelisted) {
@@ -113,12 +106,6 @@ contract PureFiBotProtection is Context, Ownable, IBotProtectedV1Token, IBotProt
     function setBotProtectionDebounceTime(uint256 time) external onlyOwner {
         botProtectionDebounceTime = time;
     }
-
-    // modifier botProtected(address from, address to) {
-    //     bool isBotTransfer = isPotentialBot(from) || isPotentialBot(to);
-    //     require(!isBotTransfer, "PureFiBotProtection: bot transaction debounced");
-    //     _;
-    // }
 
     function isPotentialBot(address account) external override onlyProtectedToken returns (bool){
         return _isPotentialBot(account);
