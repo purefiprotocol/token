@@ -28,6 +28,10 @@ module.exports = async function (deployer, network, accounts) {
         trustedForwarder = '0xeB230bF62267E94e657b5cbE74bdcea78EB3a5AB';
     }else if(network == 'test'){
         trustedForwarder = '0xAa3E82b4c4093b4bA13Cb5714382C99ADBf750cA';
+    }else if(network == 'bsctest' || network == 'bsctest-fork'){
+        trustedForwarder = '0xeB230bF62267E94e657b5cbE74bdcea78EB3a5AB';
+    }else if(network == 'bsc' || network == 'bsc-fork'){
+        trustedForwarder = '0xeB230bF62267E94e657b5cbE74bdcea78EB3a5AB';
     }
 
     console.log("Deploy: Admin: "+admin);
@@ -98,11 +102,17 @@ module.exports = async function (deployer, network, accounts) {
             let decimals = toBN(10).pow(await pureFiToken.decimals.call());
             totalRewardPerBlock = toBN(100).mul(decimals);
             let startDate = Math.round((new Date().getTime())/1000)+10;
-            await farming.initialize.sendTransaction(accounts[0],pureFiToken.address,totalRewardPerBlock,toBN(startDate), {from: admin});
+            await farming.initialize.sendTransaction(admin,pureFiToken.address,totalRewardPerBlock,toBN(startDate), {from: admin});
             //send tokens to farming contract
             if(network != 'test'){
-                await pureFiToken.transfer(farming.address, toBN(100000).mul(decimals));
+                await pureFiToken.transfer(farming.address, toBN(100000).mul(decimals), {from: admin});
+                //send test tokens to the team:
+                await pureFiToken.transfer('0x0978C0a76Ea13C318875Df7e87Bc3959d3Ad2816', toBN(100000).mul(decimals), {from: admin});
+                await pureFiToken.transfer('0x7cCC10129cebc6A5d64C63989c66F7DCC2F25926', toBN(100000).mul(decimals), {from: admin});
+                await pureFiToken.transfer('0x45331a8Cab954FeDaEbc6635abE94b8CFa8486B6', toBN(100000).mul(decimals), {from: admin});
             }
+            
+
             //add pool
             let farmingStartBlock;
             let farmingEndBlock;
@@ -111,20 +121,20 @@ module.exports = async function (deployer, network, accounts) {
                 console.log("block number: ", block.toString());
                 farmingStartBlock = block.add(toBN(10));
                 farmingEndBlock = block.add(toBN(100000));
-            } else{
-                let block = await web3.eth.getBlock("latest")
-                console.log("block number: ", block.number.toString());
-                // let block= await time.latestBlock();
-                farmingStartBlock = block.number.add(toBN(10));
-                farmingEndBlock = block.number.add(toBN(100000));
+            } else if(network == 'rinkeby' || network == 'rinkeby-fork'){
+                farmingStartBlock = toBN(8979600);
+                farmingEndBlock = toBN(9279600);
+            } else if(network == 'bsctest' || network == 'bsctest-fork'){
+                farmingStartBlock = toBN(10805417);
+                farmingEndBlock = toBN(13805417);
             }
 
-            await farming.addPool.sendTransaction(toBN(100), pureFiToken.address, farmingStartBlock, farmingEndBlock, true);
+            await farming.addPool.sendTransaction(toBN(100), pureFiToken.address, farmingStartBlock, farmingEndBlock, true, {from:admin});
 
             let data = await farming.getPool.call(toBN(0));
             let index=0;
-            console.log("share: ", data[index++].toString());
             console.log("token: ", data[index++].toString());
+            console.log("allocPoint: ", data[index++].toString());
             console.log("startBlock: ", data[index++].toString());
             console.log("endBlock: ", data[index++].toString());
             console.log("lastRewardBlock: ", data[index++].toString());
@@ -132,10 +142,4 @@ module.exports = async function (deployer, network, accounts) {
             console.log("totalDeposited: ", data[index++].toString());
         }
     
-
-   
-    
-
-  
-
 };

@@ -301,6 +301,10 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     //************* VIEW FUNCTIONS ********************************
 
+    function getContractData() external override view returns (uint256, uint256, uint64){
+        return (tokensFarmedPerBlock, totalAllocPoint, noRewardClaimsUntil);
+    }
+
     function getPoolLength() external override view returns (uint256) {
         return poolInfo.length;
     }
