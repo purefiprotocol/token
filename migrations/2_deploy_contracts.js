@@ -32,7 +32,7 @@ module.exports = async function (deployer, network, accounts) {
     //     trustedForwarder = '0xeB230bF62267E94e657b5cbE74bdcea78EB3a5AB';
     // }else if(network == 'bsc' || network == 'bsc-fork'){
     //     trustedForwarder = '0xeB230bF62267E94e657b5cbE74bdcea78EB3a5AB';
-    }
+    // }
 
     console.log("Deploy: Admin: "+admin);
     // console.log("Deploy: forwarder: "+trustedForwarder);
