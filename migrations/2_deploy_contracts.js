@@ -56,6 +56,8 @@ module.exports = async function (deployer, network, accounts) {
         botProtector = instance; 
     });
 
+    await pureFiToken.setBotProtector.sendTransaction(botProtector.address, {from:admin});
+
     //deploy master admin
     let proxyAdmin;
     await PProxyAdmin.new().then(instance => proxyAdmin = instance);
