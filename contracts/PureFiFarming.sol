@@ -7,9 +7,6 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/proxy/utils/Initi
 import "../openzeppelin-contracts-upgradeable-master/contracts/security/PausableUpgradeable.sol";
 import "./interfaces/IPureFiFarming.sol";
 
-interface ILiquidityMigrator {
-    function migrate(IERC20Upgradeable token) external returns (IERC20Upgradeable);
-}
 
 // Derived from Sushi Farming contract
 
@@ -54,9 +51,6 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     IERC20Upgradeable public rewardToken;
     // Token tokens created per block.
     uint256 public tokensFarmedPerBlock;
-    // The migrator contract. It has a lot of power. Can only be set through governance (owner).
-    ILiquidityMigrator public migrator;
-
     // Info of each pool.
     PoolInfo[] public poolInfo;
     // Info of each user that stakes LP tokens.
@@ -166,23 +160,6 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     //************* ADMIN FUNCTIONS ********************************
-
-    // Set the migrator contract. Can only be called by the owner.
-    function setMigrator(address _migrator) public onlyAdmin {
-        migrator = ILiquidityMigrator(_migrator);
-    }
-
-    // Migrate lp token to another lp contract. We trust that migrator contract is good.
-    function migrate(uint16 _pid) public onlyAdmin {
-        require(address(migrator) != address(0), "migrate: no migrator");
-        PoolInfo storage pool = poolInfo[_pid];
-        IERC20Upgradeable lpToken = pool.lpToken;
-        uint256 bal = lpToken.balanceOf(address(this));
-        lpToken.safeApprove(address(migrator), bal);
-        IERC20Upgradeable newLpToken = migrator.migrate(lpToken);
-        require(bal == newLpToken.balanceOf(address(this)), "migrate: bad");
-        pool.lpToken = newLpToken;
-    }
 
     function withdrawRewardTokens(address _to, uint256 _amount) public onlyAdmin {
         rewardToken.safeTransfer(_to, _amount);
