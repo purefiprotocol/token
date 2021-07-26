@@ -5,6 +5,7 @@ const PureFiFarming = artifacts.require('PureFiFarming');
 const PProxyAdmin = artifacts.require('PProxyAdmin');
 const PProxy = artifacts.require('PProxy');
 const PureFiBotProtection = artifacts.require('PureFiBotProtection');
+const IETHBSCBridge = artifacts.require('IETHBSCBridge');
 const web3 = require("web3");
 const BN = web3.utils.BN;
 const { time } = require('@openzeppelin/test-helpers');
@@ -13,19 +14,48 @@ function toBN(number) {
     return web3.utils.toBN(number);
 }
 
+function printEvents(txResult, strdata) {
+    console.log(strdata, " events:", txResult.logs.length);
+    for (var i = 0; i < txResult.logs.length; i++) {
+        let argsLength = Object.keys(txResult.logs[i].args).length;
+        console.log("Event ", txResult.logs[i].event, "  length:", argsLength);
+        for (var j = 0; j < argsLength; j++) {
+            if (!(typeof txResult.logs[i].args[j] === 'undefined') && txResult.logs[i].args[j].toString().length > 0)
+                console.log(">", i, ">", j, " ", txResult.logs[i].args[j].toString());
+        }
+    }
+}
+
 module.exports = async function (deployer, network, accounts) {
     
     let admin = accounts[0];
+
     console.log("Deploy: Admin: "+admin);
-    
-    let pureFiToken;
-    await deployer.deploy(PureFiToken, admin)
-    .then(function(){
-        console.log("PureFiToken instance: ", PureFiToken.address);
-        return PureFiToken.at(PureFiToken.address);
-    }).then(function (instance){
-        pureFiToken = instance; 
-    });
+
+    let pureFiTokenAddress;
+
+    if(network == 'rinkeby' || network == 'rinkeby-fork'){
+        pureFiTokenAddress = '';
+    } else if(network == 'mainnet' || network == 'mainnet-fork'){
+        pureFiTokenAddress = '';
+    } else if(network == 'kovan' || network == 'kovan-fork'){
+        pureFiTokenAddress = '';
+    }else if(network == 'ropsten' || network == 'ropsten-fork'){
+        pureFiTokenAddress = '';
+    }else if(network == 'test'){
+        pureFiTokenAddress = '';
+    }else if(network == 'bsctest' || network == 'bsctest-fork'){
+        pureFiTokenAddress = '';
+    }else if(network == 'bsc' || network == 'bsc-fork'){
+        pureFiTokenAddress = '';
+    }
+
+    if(pureFiTokenAddress.length==0){
+        throw new Error("No token address defined");
+    }
+
+
+    let pureFiToken = await PureFiToken.at(pureFiTokenAddress);
 
     let botProtector;
     await deployer.deploy(PureFiBotProtection, admin, pureFiToken.address)

@@ -12,9 +12,13 @@
     "test": "truffle test --network test",
     "full-test": "concurrently --kill-others \"npm run ganache\" \"npm run test\"",
     "test-farming": "concurrently --kill-others \"npm run ganache\" \"npm run test test/purefiFarmingTest.js\"",
+    "test-token-mainnet": "concurrently --kill-others \"npm run ganachemain\" \"npm run test test/purefiPairDeployMainnetTest.js\"",
+    "test-token-bsc": "concurrently --kill-others \"npm run ganachebsc\" \"npm run test test/purefiPairDeployBSCTest.js\"",
     "compile": "truffle compile",
     "remixd": "remixd -s ./contracts/ --remix-ide https://remix.ethereum.org",
     "ganache": "ganache-cli -q --networkId 5777 -l 40000000 -a ${ACCOUNT_AMOUNT:-10}",
+    "ganachemain": "ganache-cli --networkId 5777 -q -f https://mainnet.infura.io/v3/c354fbd01fc446baa5422b69db1f4a24 -a ${ACCOUNT_AMOUNT:-10} ",
+    "ganachebsc": "ganache-cli -f https://bsc-dataseed1.binance.org -q -i 5777 --hardfork istanbul -l 40000000 -e 10000 -a ${ACCOUNT_AMOUNT:-10} ",
     "migrate": "truffle migrate",
     "migraterinkeby": "truffle migrate --network rinkeby --reset --skip-dry-run",
     "migratetest": "truffle migrate --network test --reset"
