@@ -64,6 +64,21 @@ import "./interfaces/IPureFiFarming.sol";
     emit TokensVested(_beneficiary, _paymentPlan, _startDate, _amount);
   }
 
+  function withdrawAvailableTokens() public whenNotPaused {
+    (, uint256 available) = withdrawableAmount(msg.sender);
+    _prepareWithdraw(available);
+    token.safeTransfer(msg.sender, available);
+  }
+
+  function withdrawAndStakeAvailableTokens() public whenNotPaused {
+    require(farmingContract != address(0),"Farming contract is not defined");
+    (, uint256 available) = withdrawableAmount(msg.sender);
+    _prepareWithdraw(available);
+    //stake on farming contract instead of withdrawal
+    token.safeApprove(farmingContract, available);
+    IPureFiFarming(farmingContract).depositTo(farmingContractPool, available, msg.sender);
+  }
+
   function withdraw(uint256 _amount) public whenNotPaused {
     _prepareWithdraw(_amount);
     token.safeTransfer(msg.sender, _amount);
