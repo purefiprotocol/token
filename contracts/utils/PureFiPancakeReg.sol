@@ -5,33 +5,39 @@ import "../../openzeppelin-contracts-master/contracts/token/ERC20/IERC20.sol";
 
 import "../interfaces/IBotProtectorMaster.sol";
 import "../pancake/interfaces/IPancakeRouter01.sol";
+import "../pancake/interfaces/IPancakeFactory.sol";
 
 contract PureFiPancakeReg {
 
    event LiquidityAdded(uint amountToken, uint amountETH, uint liquidity);
    
    function routerAddress() public pure returns(address) {
-      return 0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F;
+      return 0x10ED43C718714eb63d5aA57B78B54704E256024E;
    }
 
    function registerPair(address pureFiToken, address botProtection, uint256 amountUFI, uint256 firewallBlockLength, uint256 firewallTimeLength) external payable {
       // 1) Create pair
       IPancakeRouter01 router = IPancakeRouter01(routerAddress());
       // 3) Enable protection
-      IBotProtectorMaster(botProtection).prepareBotProtection(firewallBlockLength,firewallTimeLength);
+      IBotProtectorMaster(botProtection).prepareBotProtection(firewallBlockLength, firewallTimeLength);
       // add liquidity
       IERC20(pureFiToken).approve(address(router), amountUFI);
       (uint amountToken, uint amountETH, uint liquidity) = router.addLiquidityETH{value:msg.value}(
         pureFiToken,
         amountUFI,
-        amountUFI,
-        msg.value,
+        0,
+        0,
         msg.sender,
-        block.timestamp + 30 seconds
+        block.timestamp
       );
 
       emit LiquidityAdded(amountToken, amountETH , liquidity);     
    } 
+
+//    function getPairAddress2(address pureFiToken) public view returns (address){
+//       IPancakeRouter01 router = IPancakeRouter01(routerAddress());
+//       return IPancakeFactory(router.factory()).getPair(pureFiToken, router.WETH());
+//    }
 
    function getPairAddress(address pureFiToken) public pure returns (address){
       IPancakeRouter01 router = IPancakeRouter01(routerAddress());
@@ -39,7 +45,7 @@ contract PureFiPancakeReg {
       return pairFor(router.factory(), pureFiToken, wethAddress);
    }
 
-   // returns sorted token addresses, used to handle return values from pairs sorted in this order
+    // returns sorted token addresses, used to handle return values from pairs sorted in this order
     function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
         require(tokenA != tokenB, 'PancakeLibrary: IDENTICAL_ADDRESSES');
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -53,7 +59,7 @@ contract PureFiPancakeReg {
                 hex'ff',
                 factory,
                 keccak256(abi.encodePacked(token0, token1)),
-                hex'd0d4c4cd0848c93cb4fd1f498d7013ee6bfb25783ea21593d5834f5d250ece66' // init code hash
+                hex'00fb7f630766e6a796048ea87d01acd3068e8ff67d078148a3fa3f4a84f69bd5' // init code hash
             )))));
     }
 }

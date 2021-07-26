@@ -25,10 +25,10 @@ contract PureFiUniswapReg {
       (uint amountToken, uint amountETH, uint liquidity) = router.addLiquidityETH{value:msg.value}(
         pureFiToken,
         amountUFI,
-        amountUFI,
-        msg.value,
+        0,
+        0,
         msg.sender,
-        block.timestamp + 30 seconds
+        block.timestamp
       );
 
       emit LiquidityAdded(amountToken, amountETH , liquidity);     
