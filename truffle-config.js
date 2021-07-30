@@ -27,8 +27,8 @@ module.exports = {
     mainnet: {
       network_id: 1,
       provider: () => new HDWalletProvider(mnemonic, Infura.Mainnet),
-      gas: 10000000,
-      gasPrice: '8000000000'
+      gas: 500000,
+      gasPrice: '60100000000'
     },
     ropsten: {
       network_id: 3,
@@ -46,8 +46,8 @@ module.exports = {
       network_id: 56,
       confirmations: 10,
       timeoutBlocks: 200,
-      gas: 5000000,
-      gasPrice: 10000000000,
+      gas: 500000,
+      gasPrice: 10100000000,
       skipDryRun: false
     },
     bsctest: {

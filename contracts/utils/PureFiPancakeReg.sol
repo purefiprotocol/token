@@ -9,20 +9,32 @@ import "../pancake/interfaces/IPancakeFactory.sol";
 
 contract PureFiPancakeReg {
 
+    address public pancakeRouter;
+
+    constructor(address _router) {
+        require(address(0)!= _router, "invalid router");
+        pancakeRouter = _router;
+    }
+
    event LiquidityAdded(uint amountToken, uint amountETH, uint liquidity);
+   event Balance(uint256 amt);
    
-   function routerAddress() public pure returns(address) {
-      return 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+   function routerAddress() public view returns(address) {
+      return pancakeRouter;
    }
 
-   function registerPair(address pureFiToken, address botProtection, uint256 amountUFI, uint256 firewallBlockLength, uint256 firewallTimeLength) external payable {
+   function someCoins() public payable{
+       emit Balance(msg.value);
+   }
+
+   function registerPair(address pureFiToken, address botProtection, uint256 amountUFI, uint256 amountBNBliq, uint256 firewallBlockLength, uint256 firewallTimeLength) external payable {
       // 1) Create pair
       IPancakeRouter01 router = IPancakeRouter01(routerAddress());
       // 3) Enable protection
       IBotProtectorMaster(botProtection).prepareBotProtection(firewallBlockLength, firewallTimeLength);
       // add liquidity
       IERC20(pureFiToken).approve(address(router), amountUFI);
-      (uint amountToken, uint amountETH, uint liquidity) = router.addLiquidityETH{value:msg.value}(
+      (uint amountToken, uint amountETH, uint liquidity) = router.addLiquidityETH{value:amountBNBliq}(
         pureFiToken,
         amountUFI,
         0,
@@ -39,7 +51,7 @@ contract PureFiPancakeReg {
 //       return IPancakeFactory(router.factory()).getPair(pureFiToken, router.WETH());
 //    }
 
-   function getPairAddress(address pureFiToken) public pure returns (address){
+   function getPairAddress(address pureFiToken) public view returns (address){
       IPancakeRouter01 router = IPancakeRouter01(routerAddress());
       address wethAddress = router.WETH();
       return pairFor(router.factory(), pureFiToken, wethAddress);

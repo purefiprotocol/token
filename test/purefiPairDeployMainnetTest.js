@@ -32,7 +32,7 @@ function printEvents(txResult, strdata){
 }
 
 
-contract('PureFiToken', (accounts) => {
+contract('PureFi Uniswwap pair deploy', (accounts) => {
  
     let admin   = accounts[0];
     const decimals = toBN(10).pow(toBN(18));
@@ -77,11 +77,7 @@ contract('PureFiToken', (accounts) => {
         let pairAddress = await regContract.getPairAddress(pureFiToken.address);
         console.log("Pair Address", pairAddress);
 
-        let whitelist = [router, admin , pairAddress, regContract.address,
-            '0x03F39b5355Ea172ba7e9198Fd9E7fB6977Fee842',
-            '0xc81767c223C35A2cC6fd59dbE5D1Db1bEcbc3022',
-            '0x2c8BA1f0B04d8EBE186451abDEAb0e486Dae3774',
-            '0xF1dfB8e10e843Fa2022d1F6208dd7f6E66497986'];
+        let whitelist = [router, admin , pairAddress, regContract.address];
         
         //whitelist 
         await botProtection.setBotLaunchpad(regContract.address, {from:admin});
@@ -93,22 +89,19 @@ contract('PureFiToken', (accounts) => {
         let amountETH = toBN('21308000000000000')//$45
 
         await pureFiToken.transfer(regContract.address, amountUFI, {from:admin});
-        let regTx = await regContract.registerPair(pureFiToken.address, botProtection.address, amountUFI, firewallBlockLength, firewallTimeLength, {from:admin, value: amountETH});
+        let regTx = await regContract.registerPair(pureFiToken.address, botProtection.address, amountUFI, amountETH, firewallBlockLength, firewallTimeLength, {from:admin, value: amountETH});
         printEvents(regTx);
 
-        // let pairAddress2 = await regContract.getPairAddress2(pureFiToken.address);
-        // console.log("Pair Address", pairAddress2);
+        //expire protection
+        await time.increase(time.duration.seconds(310));
+        let currentBlock = await time.latestBlock();
+        for(let i=0;i<11;i++){
+            await time.advanceBlock();
+        }
+        let shifedBlock = await time.latestBlock();
+        console.log("Shifting block: ",currentBlock.toString()," => ",shifedBlock.toString());
 
-         //expire protection
-         await time.increase(time.duration.seconds(310));
-         let currentBlock = await time.latestBlock();
-         for(let i=0;i<11;i++){
-             await time.advanceBlock();
-         }
-         let shifedBlock = await time.latestBlock();
-         console.log("Shifting block: ",currentBlock.toString()," => ",shifedBlock.toString());
-
-         await botProtection.finalizeBotProtection.sendTransaction({from:admin});
+        await botProtection.finalizeBotProtection.sendTransaction({from:admin});
     });
 
     

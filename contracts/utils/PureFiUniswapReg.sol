@@ -10,19 +10,24 @@ import "../uniswap/FactoryInterface.sol";
 contract PureFiUniswapReg {
 
    event LiquidityAdded(uint amountToken, uint amountETH, uint liquidity);
+   event Balance(uint256 amt);
    
    function routerAddress() public pure returns(address) {
       return 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
    }
 
-   function registerPair(address pureFiToken, address botProtection, uint256 amountUFI, uint256 firewallBlockLength, uint256 firewallTimeLength) public payable {
+   function someCoins() public payable{
+       emit Balance(msg.value);
+   }
+
+   function registerPair(address pureFiToken, address botProtection, uint256 amountUFI, uint256 amountETHliq, uint256 firewallBlockLength, uint256 firewallTimeLength) public payable {
       // 1) Create pair
       IUniswapV2Router01 router = IUniswapV2Router01(routerAddress());
       // 3) Enable protection
       IBotProtectorMaster(botProtection).prepareBotProtection(firewallBlockLength,firewallTimeLength);
       // add liquidity
       IERC20(pureFiToken).approve(address(router), amountUFI);
-      (uint amountToken, uint amountETH, uint liquidity) = router.addLiquidityETH{value:msg.value}(
+      (uint amountToken, uint amountETH, uint liquidity) = router.addLiquidityETH{value:amountETHliq}(
         pureFiToken,
         amountUFI,
         0,
