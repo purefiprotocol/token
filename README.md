@@ -21,7 +21,7 @@ Token codebase is Truffle based.
 `npm i` then `truffle compile`
 
 ## Pure FI Token contract
-PureFi ERC20 Token implementation based on Open Zeppelin contracts.  
+PureFi ERC20 Token implementation is based on the Open Zeppelin contracts.
 
 Features:
 - Pausable
@@ -30,13 +30,12 @@ Features:
 
 ## Payment plan with fixed date unlocks
 
-Designed for vesting tokens with that unlocks on exact dates. 
+The payment plan is designed for vesting tokens that unlock on exact dates.
 
 ## Payment plan with linear unlocks
-
-Designed for vesting tokens with a cliff and linear unlock every `period` of time with exact percentage until 100% unlocked. 
+ 
+The payment plan is designed for vesting tokens with a cliff, and linear unlock every time (specified by the `period` parameter) with exact percentage until 100% are unlocked.
 
 ## Farming contract
 
-PureFi farming is designed to reward a fixed amount of tokens per block. Therefore APY would be dynamic and based amount of users that staked their tokens on the Farming contract. Supports farming in mulpiple pools with different liquidity tokens. 
-
+PureFi farming is designed to reward a fixed amount of tokens per block. Therefore, APY would be dynamic and based on users who staked their tokens on the Farming contract. The farming contract supports farming in multiple pools with different liquidity tokens
