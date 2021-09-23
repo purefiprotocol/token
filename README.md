@@ -14,6 +14,10 @@
 1. Payment Plan contract (Linear unlock): [0xafAb7848AaB0F9EEF9F9e29a83BdBBBdDE02ECe5](https://bscscan.com/address/0xafAb7848AaB0F9EEF9F9e29a83BdBBBdDE02ECe5)
 1. Farming contract: [0x33f86fDc03387A066c4395677658747c696932Eb](https://bscscan.com/address/0x33f86fDc03387A066c4395677658747c696932Eb)
 
+## Polygon
+
+1. UFI Token contract: [0xf2D3F6846aB7BC3e860C6F2C8c0b8fFBbDFC9931](https://polygonscan.com/token/0xf2D3F6846aB7BC3e860C6F2C8c0b8fFBbDFC9931)
+
 # PureFi Token codebase
 
 Token codebase is Truffle based. 
