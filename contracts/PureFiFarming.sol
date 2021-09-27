@@ -60,6 +60,11 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     // timestamp until claiming rewards are disabled;
     uint64 public noRewardClaimsUntil;
 
+    mapping (uint16 => mapping (address => uint64)) public userStakedTime;
+    mapping (uint16 => uint64) public minStakingTimeForPool;
+
+    uint32 private storageVersion;
+
     event PoolAdded(uint256 indexed pid);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
@@ -86,7 +91,16 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(1001000);
+        return uint32(1002000);
+    }
+
+    function upgradeStorage() public {
+        if(storageVersion < version()){
+            for(uint i=0;i<poolInfo.length;i++){
+                minStakingTimeForPool[uint16(i)] = 0;
+            }
+            storageVersion = version();
+        }
     }
 
     /**
@@ -119,7 +133,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function addPool(uint64 _allocPoint, address _lpTokenAddress, uint64 _startBlock, uint64 _endBlock, bool _withUpdate) public onlyManager {
+    function addPool(uint64 _allocPoint, address _lpTokenAddress, uint64 _startBlock, uint64 _endBlock, uint64 _minStakingTime, bool _withUpdate) public onlyManager {
         require (block.number < _endBlock, "Incorrect endblock number");
         IERC20Upgradeable _lpToken = IERC20Upgradeable(_lpTokenAddress);
         if (_withUpdate) {
@@ -136,17 +150,19 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             accTokenPerShare: 0,
             totalDeposited: 0
         }));
+        minStakingTimeForPool[uint16(poolInfo.length-1)] = _minStakingTime;
 
         emit PoolAdded(poolInfo.length-1);
     }
 
     // Update the given pool's Token allocation point. Can only be called by the owner.
-    function updatePoolData(uint16 _pid, uint64 _allocPoint, uint64 _startBlock, uint64 _endBlock, bool _withUpdate) public onlyManager {
+    function updatePoolData(uint16 _pid, uint64 _allocPoint, uint64 _startBlock, uint64 _endBlock, uint64 _minStakingTime, bool _withUpdate) public onlyManager {
         if (_withUpdate) {
             massUpdatePools();
         }
         totalAllocPoint = totalAllocPoint - poolInfo[_pid].allocPoint + _allocPoint;
         poolInfo[_pid].allocPoint = _allocPoint;
+        minStakingTimeForPool[_pid] = _minStakingTime;
         if(_startBlock > 0){
             poolInfo[_pid].startBlock = _startBlock;
         }
@@ -204,6 +220,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             pool.totalDeposited += _amount;
         }
         user.rewardDebt = user.amount * pool.accTokenPerShare / 1e12;
+        userStakedTime[_pid][_beneficiary] = uint64(block.timestamp); //save last user staked time;
         emit Deposit(_beneficiary, _pid, _amount);
     }
 
@@ -212,6 +229,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
+        require(userStakedTime[_pid][msg.sender] == 0 || userStakedTime[_pid][msg.sender] + minStakingTimeForPool[_pid] <= block.timestamp || block.number >= pool.endBlock, "Withdrawing stake is not allowed yet");
         updatePool(_pid);
         user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
         if(_amount > 0) {
@@ -246,6 +264,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
         user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
+        require(userStakedTime[_pid][msg.sender] == 0 || userStakedTime[_pid][msg.sender] + minStakingTimeForPool[_pid] <= block.timestamp || block.number >= pool.endBlock, "Withdrawing stake is not allowed yet");
         if(user.amount > 0) {
             uint256 amountLiquidity = user.amount;
             pool.totalDeposited -= amountLiquidity;
@@ -292,6 +311,11 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         return (address(pool.lpToken), pool.allocPoint, pool.startBlock, pool.endBlock, pool.lastRewardBlock, pool.accTokenPerShare, pool.totalDeposited);
     }
 
+    function getPoolMinStakingTime(uint16 _index) public view returns(uint64){
+        require (_index < poolInfo.length, "index incorrect");
+        return minStakingTimeForPool[_index];
+    }
+
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _pid, uint256 _from, uint256 _to) public view returns (uint256) {
         require (_from <= _to, "incorrect from/to sequence");
@@ -315,6 +339,10 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             accTokenPerShare += amountRewardedPerPool * 1e12 / pool.totalDeposited;
         }
         return (user.amount, user.totalRewarded, user.pendingReward + user.amount * accTokenPerShare / 1e12 - user.rewardDebt);
+    }
+
+    function getUserStakedTime(uint16 _pid, address _user) external view returns(uint64) {
+        return userStakedTime[_pid][_user];
     }
 
     //************* INTERNAL FUNCTIONS ********************************

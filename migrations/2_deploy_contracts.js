@@ -111,7 +111,7 @@ module.exports = async function (deployer, network, accounts) {
                 farmingEndBlock = toBN(13805417);
             }
 
-            await farming.addPool.sendTransaction(toBN(100), pureFiToken.address, farmingStartBlock, farmingEndBlock, true, {from:admin});
+            await farming.addPool.sendTransaction(toBN(100), pureFiToken.address, farmingStartBlock, farmingEndBlock, toBN(0), true, {from:admin});
 
             let data = await farming.getPool.call(toBN(0));
             let index=0;

@@ -91,7 +91,7 @@ contract('PureFiFarming', (accounts) => {
 
     it('Farming add pool', async () => {
  
-        await farming.addPool.sendTransaction(toBN(100),pureFiToken.address, farmingStartBlock, farmingEndBlock, true);
+        await farming.addPool.sendTransaction(toBN(100),pureFiToken.address, farmingStartBlock, farmingEndBlock, toBN(0), true);
         
         let data = await farming.getPool.call(toBN(0));
         let index=0;
@@ -116,7 +116,6 @@ contract('PureFiFarming', (accounts) => {
             expect(data[1]).to.be.eq.BN(toBN(0));
             expect(data[2]).to.be.eq.BN(toBN(0));
         }
-        
         await farming.withdraw.sendTransaction(toBN(0),depositBalance);
 
         {
@@ -276,6 +275,127 @@ contract('PureFiFarming', (accounts) => {
                 expect(data[0]).to.be.eq.BN(availableAmount);
             }
         }
+        
+    });
+
+    it('Farming update pool', async () => {
+        {
+            console.log("******* Before ************");
+            let data = await farming.getPool.call(toBN(0));
+            let index=0;
+            console.log("token: ", data[index++].toString());
+            console.log("allocPoint: ", data[index++].toString());
+            console.log("startBlock: ", data[index++].toString());
+            console.log("endBlock: ", data[index++].toString());
+            console.log("lastRewardBlock: ", data[index++].toString());
+            console.log("acctPerShare: ", data[index++].toString());
+            console.log("totalDeposited: ", data[index++].toString());
+        }
+
+        // await farming.updatePoolData.sendTransaction(toBN(0), toBN(100), farmingStartBlock, farmingEndBlock.add(toBN(1)), false);
+        // await farming.setTokenPerBlock.sendTransaction(totalRewardPerBlock.mul(toBN(2)));
+
+        {
+            console.log("******* AFTER ************");
+            let data = await farming.getPool.call(toBN(0));
+            let index=0;
+            console.log("token: ", data[index++].toString());
+            console.log("allocPoint: ", data[index++].toString());
+            console.log("startBlock: ", data[index++].toString());
+            console.log("endBlock: ", data[index++].toString());
+            console.log("lastRewardBlock: ", data[index++].toString());
+            console.log("acctPerShare: ", data[index++].toString());
+            console.log("totalDeposited: ", data[index++].toString());
+        }
+ 
+        
+    });
+
+    it('Farm after updated', async () => {
+        //exit everything before 
+        await farming.exit.sendTransaction(toBN(0));
+
+        let depositBalance = toBN(100).mul(decimals);
+        await pureFiToken.approve.sendTransaction(farming.address, depositBalance, {from: accounts[0]});
+        let depoRes = await farming.deposit.sendTransaction(toBN(0),depositBalance);
+        printEvents(depoRes,"DepoRes");
+
+        {
+            let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
+            expect(data[0]).to.be.eq.BN(depositBalance);
+            // expect(data[1]).to.be.eq.BN(toBN(0));
+            expect(data[2]).to.be.eq.BN(toBN(0));
+        }
+        
+        //shift some blocks
+        await advanceBlock(10);
+
+        {
+            let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
+            let index=0;
+            console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
+            console.log("withdrawableReward: ", data[index++].toString());
+        }
+
+        
+        // await time.increase(time.duration.days(1));            
+
+        // {
+        //     let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
+        //     let index=0;
+        //     console.log("amount: ", data[index++].toString());
+        //     console.log("totalRewardClaimed: ", data[index++].toString());
+        //     console.log("withdrawableReward: ", data[index++].toString());
+        // }
+
+        let claimRes = await farming.claimReward.sendTransaction(toBN(0));
+        printEvents(claimRes, "claimRes");
+        {
+            let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
+            let index=0;
+            console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
+            console.log("withdrawableReward: ", data[index++].toString());
+        }
+
+
+
+        await farming.updatePoolData.sendTransaction(toBN(0), toBN(100), farmingStartBlock, farmingEndBlock.add(toBN(1)), toBN(0), false);
+        await farming.setTokenPerBlock.sendTransaction(totalRewardPerBlock.mul(toBN(2)));
+        await advanceBlock(8);
+
+
+
+        {
+            let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
+            let index=0;
+            console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
+            console.log("withdrawableReward: ", data[index++].toString());
+        }
+        // await farming.deposit.sendTransaction(toBN(0),depositBalance);
+        let exitRes = await farming.exit.sendTransaction(toBN(0));
+        printEvents(exitRes, "exitRes");
+        {
+            let data = await farming.getUserInfo.call(toBN(0),accounts[0]);
+            let index=0;
+            console.log("amount: ", data[index++].toString());
+            console.log("totalRewardClaimed: ", data[index++].toString());
+            console.log("withdrawableReward: ", data[index++].toString());
+        }
+        {
+            let data = await farming.getPool.call(toBN(0));
+            let index=0;
+            console.log("token: ", data[index++].toString());
+            console.log("share: ", data[index++].toString());
+            console.log("startBlock: ", data[index++].toString());
+            console.log("endBlock: ", data[index++].toString());
+            console.log("lastRewardBlock: ", data[index++].toString());
+            console.log("acctPerShare: ", data[index++].toString());
+            console.log("totalDeposited: ", data[index++].toString());
+        }
+
         
     });
 
