@@ -62,6 +62,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     mapping (uint16 => mapping (address => uint64)) public userStakedTime;
     mapping (uint16 => uint64) public minStakingTimeForPool;
+    mapping (uint16 => uint256) public maxStakingAmountForPool;
 
     uint32 private storageVersion;
 
@@ -91,16 +92,16 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(1002000);
+        return uint32(1002001);
     }
 
     function upgradeStorage() public {
-        if(storageVersion < version()){
+        if(storageVersion < uint32(1002000)){
             for(uint i=0;i<poolInfo.length;i++){
                 minStakingTimeForPool[uint16(i)] = 0;
-            }
-            storageVersion = version();
+            }            
         }
+        storageVersion = version();
     }
 
     /**
@@ -133,7 +134,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function addPool(uint64 _allocPoint, address _lpTokenAddress, uint64 _startBlock, uint64 _endBlock, uint64 _minStakingTime, bool _withUpdate) public onlyManager {
+    function addPool(uint64 _allocPoint, address _lpTokenAddress, uint64 _startBlock, uint64 _endBlock, uint64 _minStakingTime, uint256 _maxStakingAmount, bool _withUpdate) public onlyManager {
         require (block.number < _endBlock, "Incorrect endblock number");
         IERC20Upgradeable _lpToken = IERC20Upgradeable(_lpTokenAddress);
         if (_withUpdate) {
@@ -151,18 +152,20 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             totalDeposited: 0
         }));
         minStakingTimeForPool[uint16(poolInfo.length-1)] = _minStakingTime;
+        maxStakingAmountForPool[uint16(poolInfo.length-1)] = _maxStakingAmount;
 
         emit PoolAdded(poolInfo.length-1);
     }
 
     // Update the given pool's Token allocation point. Can only be called by the owner.
-    function updatePoolData(uint16 _pid, uint64 _allocPoint, uint64 _startBlock, uint64 _endBlock, uint64 _minStakingTime, bool _withUpdate) public onlyManager {
+    function updatePoolData(uint16 _pid, uint64 _allocPoint, uint64 _startBlock, uint64 _endBlock, uint64 _minStakingTime, uint256 _maxStakingAmount, bool _withUpdate) public onlyManager {
         if (_withUpdate) {
             massUpdatePools();
         }
         totalAllocPoint = totalAllocPoint - poolInfo[_pid].allocPoint + _allocPoint;
         poolInfo[_pid].allocPoint = _allocPoint;
         minStakingTimeForPool[_pid] = _minStakingTime;
+        maxStakingAmountForPool[_pid] = _maxStakingAmount;
         if(_startBlock > 0){
             poolInfo[_pid].startBlock = _startBlock;
         }
@@ -230,6 +233,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         require(userStakedTime[_pid][msg.sender] == 0 || userStakedTime[_pid][msg.sender] + minStakingTimeForPool[_pid] <= block.timestamp || block.number >= pool.endBlock, "Withdrawing stake is not allowed yet");
+        require(_amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
         updatePool(_pid);
         user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
         if(_amount > 0) {
@@ -314,6 +318,11 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     function getPoolMinStakingTime(uint16 _index) public view returns(uint64){
         require (_index < poolInfo.length, "index incorrect");
         return minStakingTimeForPool[_index];
+    }
+
+    function getPoolMaxStakingAmount(uint16 _index) public view returns(uint256){
+        require (_index < poolInfo.length, "index incorrect");
+        return maxStakingAmountForPool[_index];
     }
 
     // Return reward multiplier over the given _from to _to block.
