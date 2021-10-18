@@ -213,6 +213,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     function depositTo(uint16 _pid, uint256 _amount, address _beneficiary) public override whenNotPaused {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_beneficiary];
+        require(_amount + user.amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
         updatePool(_pid);
         if (user.amount > 0) {
             user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
@@ -233,7 +234,6 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         require(userStakedTime[_pid][msg.sender] == 0 || userStakedTime[_pid][msg.sender] + minStakingTimeForPool[_pid] <= block.timestamp || block.number >= pool.endBlock, "Withdrawing stake is not allowed yet");
-        require(_amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
         updatePool(_pid);
         user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
         if(_amount > 0) {
