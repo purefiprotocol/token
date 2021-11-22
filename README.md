@@ -16,7 +16,7 @@
 
 ## Polygon
 
-1. UFI Token contract: [0xf2D3F6846aB7BC3e860C6F2C8c0b8fFBbDFC9931](https://polygonscan.com/token/0xf2D3F6846aB7BC3e860C6F2C8c0b8fFBbDFC9931)
+1. UFI Token contract: [0x3c205C8B3e02421Da82064646788c82f7bd753B9](https://polygonscan.com/token/0x3c205C8B3e02421Da82064646788c82f7bd753B9)
 
 # PureFi Token codebase
 
