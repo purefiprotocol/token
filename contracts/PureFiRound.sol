@@ -8,6 +8,10 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/security/Pausable
 import "../openzeppelin-contracts-upgradeable-master/contracts/metatx/ERC2771ContextUpgradeable.sol";
 import "./interfaces/IPureFiFarming.sol";
 
+interface IToken {
+    function decimals() external view returns(uint8);
+}
+
 contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, ERC2771ContextUpgradeable {
 
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -77,6 +81,7 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
         tokenX = _tokenX;
         tokenUFI = _tokenUFI;
         beneficiary = owner();
+        require(IToken(tokenUFI).decimals() >= IToken(tokenX).decimals(),"Unsupported token decimals");
 
         boosters.push(Booster(1*86400, 250));
         boosters.push(Booster(2*86400, 180));
@@ -88,7 +93,7 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
 
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(2000002);
+        return uint32(2000003);
     }
 
     function activate() external onlyOwner {
@@ -145,15 +150,11 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
     }
 
     function depositUFI(uint256 _amountUFI) external whenNotPaused {
-        require(roundStatus == Status.Active, "The round isn't active.");
-        uint32 currentBooster = _currentBoosterValue();
-        require(currentBooster > 0, "Round has not started or is already finished");
-        IERC20Upgradeable(tokenUFI).safeTransferFrom(_msgSender(), address(this), _amountUFI);
-        depositList[_msgSender()].amountUFIDeposited += _amountUFI;
-        uint256 userShares = _amountUFI * currentBooster / BOOSTER_DENOM;
-        depositList[_msgSender()].amountShares += userShares;
-        totalShares += userShares;
-        emit UserDeposit(_msgSender(), _amountUFI);
+        _depositUFIto(_amountUFI,_msgSender());
+    }
+
+    function depositUFIto(uint256 _amountUFI, address _to) external whenNotPaused {
+        _depositUFIto(_amountUFI, _to);
     }
 
 
@@ -207,9 +208,10 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
     function endRound(uint256 _priceUSDperUFI) external onlyOwner {
         require(roundStatus == Status.Active, "The round isn't active.");
         uint256 contractTokenBalanceInUFI = IERC20Upgradeable(tokenUFI).balanceOf(address(this));
+        uint8 deltaDecimals = IToken(tokenUFI).decimals() - IToken(tokenX).decimals();
         priceUSDperUFI = _priceUSDperUFI;
         uint256 depositedTotalInUSD = contractTokenBalanceInUFI * _priceUSDperUFI;
-        uint256 roundHardCapInUSD = totalAmountX * priceUSDperX;
+        uint256 roundHardCapInUSD = totalAmountX * priceUSDperX * (10 ** deltaDecimals);
         if (roundHardCapInUSD <= depositedTotalInUSD) {
             roundStatus = Status.Successful;
             emit SuccessfulRound(priceUSDperX, priceUSDperUFI, totalAmountX, contractTokenBalanceInUFI);
@@ -290,5 +292,17 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
             availableXtoClaim =  currentlyUnlockedX - depositList[_user].amountXWithdrawn;
         } 
         return availableXtoClaim;
+    }
+
+    function _depositUFIto(uint256 _amountUFI, address _user) internal {
+        require(roundStatus == Status.Active, "The round isn't active.");
+        uint32 currentBooster = _currentBoosterValue();
+        require(currentBooster > 0, "Round has not started or is already finished");
+        IERC20Upgradeable(tokenUFI).safeTransferFrom(_msgSender(), address(this), _amountUFI);
+        depositList[_user].amountUFIDeposited += _amountUFI;
+        uint256 userShares = _amountUFI * currentBooster / BOOSTER_DENOM;
+        depositList[_user].amountShares += userShares;
+        totalShares += userShares;
+        emit UserDeposit(_user, _amountUFI);
     }
 }
