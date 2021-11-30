@@ -93,7 +93,7 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
 
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(2000003);
+        return uint32(2000004);
     }
 
     function activate() external onlyOwner {
@@ -128,6 +128,10 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
 
     function setBeneficiary(address _beneficiary) external onlyOwner {
         beneficiary = _beneficiary;
+    }
+
+    function setTokenX(address _tokenX) external onlyOwner{
+        tokenX = _tokenX;
     }
 
     function setPriceX(uint256 _priceUSDperX) external onlyOwner {

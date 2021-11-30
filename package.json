@@ -14,6 +14,7 @@
     "test-farming": "concurrently --kill-others \"npm run ganache\" \"npm run test test/purefiFarmingTest.js\"",
     "test-token-mainnet": "concurrently --kill-others \"npm run ganachemain\" \"npm run test test/purefiPairDeployMainnetTest.js\"",
     "test-token-bsc": "concurrently --kill-others \"npm run ganachebsc\" \"npm run test test/purefiPairDeployBSCTest.js\"",
+    "test-buy-bsc": "concurrently --kill-others \"npm run ganachebsc\" \"npm run test test/purefiTokenBuyerTest.js\"",
     "compile": "truffle compile",
     "remixd": "remixd -s ./contracts/ --remix-ide https://remix.ethereum.org",
     "ganache": "ganache-cli -q --networkId 5777 -l 40000000 -a ${ACCOUNT_AMOUNT:-10}",
