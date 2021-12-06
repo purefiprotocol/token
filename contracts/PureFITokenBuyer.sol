@@ -29,6 +29,25 @@ contract PureFITokenBuyer is Ownable {
     }
 
     receive () external payable {
+        _buy(msg.sender);
+    }
+
+    function buyFor(address _to) external payable {
+        _buy(_to);
+    }
+
+    function routerAddress() public pure returns(address) {
+      return 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+    }
+
+    // returns sorted token addresses, used to handle return values from pairs sorted in this order
+    function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
+        require(tokenA != tokenB, 'PancakeLibrary: IDENTICAL_ADDRESSES');
+        (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        require(token0 != address(0), 'PancakeLibrary: ZERO_ADDRESS');
+    }
+
+    function _buy(address _to) internal {
         IPancakeRouter01 router = IPancakeRouter01(routerAddress());
         address[] memory path = new address[](2);
         address wethAddress = router.WETH();
@@ -43,25 +62,16 @@ contract PureFITokenBuyer is Ownable {
                 hex'00fb7f630766e6a796048ea87d01acd3068e8ff67d078148a3fa3f4a84f69bd5' // init code hash
             )))));
 
-
-        (uint112 reserve0, uint112 reserve1, ) = IPancakePair(pairAddress).getReserves();
-        uint256 ufiExpected = token0 == wethAddress ? router.getAmountOut(msg.value, reserve0, reserve1) : router.getAmountOut(msg.value, reserve1, reserve0);
-
+        uint256 ufiExpected;
+        {
+            (uint112 reserve0, uint112 reserve1, ) = IPancakePair(pairAddress).getReserves();
+            ufiExpected = token0 == wethAddress ? router.getAmountOut(msg.value, reserve0, reserve1) : router.getAmountOut(msg.value, reserve1, reserve0);
+        }
+        
         uint256 minUFIExpected = ufiExpected * (PERCENT_DENOM - slippage) / PERCENT_DENOM;
 
-        uint[] memory out = router.swapExactETHForTokens{value: msg.value}(minUFIExpected, path, msg.sender, block.timestamp);
-        emit TokenPurchase(msg.sender, out[0], out[1]);
-    }
-
-    function routerAddress() public pure returns(address) {
-      return 0x10ED43C718714eb63d5aA57B78B54704E256024E;
-    }
-
-    // returns sorted token addresses, used to handle return values from pairs sorted in this order
-    function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
-        require(tokenA != tokenB, 'PancakeLibrary: IDENTICAL_ADDRESSES');
-        (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        require(token0 != address(0), 'PancakeLibrary: ZERO_ADDRESS');
+        uint[] memory out = router.swapExactETHForTokens{value: msg.value}(minUFIExpected, path, _to, block.timestamp);
+        emit TokenPurchase(_to, out[0], out[1]);
     }
 
 }

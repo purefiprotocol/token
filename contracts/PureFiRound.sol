@@ -34,6 +34,7 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
     uint64 private noUFIClaimUntil; // no UFI can be claimed back by users until this date. 
     uint64 private XListingDate; //timestamp of the listing event of the token X. 20% of X is unlocked and can be claimed by users after this date. remaining tokens are linearly vested over time until XVestingEndDate;
     uint64 private XVestingEndDate; // 80% of X tokens are linearly vested over time until XVestingEndDate;
+    uint64 public vestingPeriod;// vesting period. tokens unvest once per period;
 
     Booster[] private boosters;
     
@@ -89,6 +90,9 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
         boosters.push(Booster(4*86400, 120));
         boosters.push(Booster(5*86400, 110));
         boosters.push(Booster(12*86400, 100));
+
+        // vestingPeriod = 1; //1 sec - default value for linear vesting over time
+        vestingPeriod = 30*24*60*60; //1 month
     }
 
     function version() public pure returns (uint32){
@@ -119,6 +123,11 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
         XListingDate = _XListingDate;
         XVestingEndDate = _XVestingEndDate;
         roundStartDate = _roundStartDate;
+    }
+
+    function setVestingPeriod(uint64 _period) external onlyOwner{
+        require(_period > 0, "Vesting period to be greater then 0");
+        vestingPeriod = _period;
     }
 
     function setFarmingContract(address _farmingContract, uint8 _poolIndex) external onlyOwner{
@@ -292,7 +301,8 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
         if(block.timestamp >= XListingDate && roundStatus == Status.Successful){
             uint256 totalUsersX = depositList[_user].amountShares * totalAmountX / totalShares;
             uint256 vestingTimestamp = (block.timestamp > XVestingEndDate)? XVestingEndDate : block.timestamp; //set max time to XVestingEndDate
-            uint256 currentlyUnlockedX = 20 * totalUsersX / 100 + 80 * (vestingTimestamp - XListingDate) * totalUsersX / (100 * (XVestingEndDate - XListingDate));
+            uint256 vestingMultiplier = vestingPeriod * ((vestingTimestamp - XListingDate) / vestingPeriod);
+            uint256 currentlyUnlockedX = 20 * totalUsersX / 100 + 80 * vestingMultiplier * totalUsersX / (100 * (XVestingEndDate - XListingDate));
             availableXtoClaim =  currentlyUnlockedX - depositList[_user].amountXWithdrawn;
         } 
         return availableXtoClaim;
