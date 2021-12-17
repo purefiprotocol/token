@@ -1,11 +1,12 @@
 pragma solidity ^0.8.0;
 
-import "./pancake/interfaces/IPancakeRouter01.sol";
-import "./pancake/interfaces/IPancakePair.sol";
-import "./pancake/interfaces/IPancakeFactory.sol";
-import "../openzeppelin-contracts-master/contracts/access/Ownable.sol";
+import "../pancake/interfaces/IPancakeRouter01.sol";
+import "../pancake/interfaces/IPancakePair.sol";
+import "../pancake/interfaces/IPancakeFactory.sol";
+import "../../openzeppelin-contracts-master/contracts/access/Ownable.sol";
+import "./ITokenBuyer.sol";
 
-contract PureFITokenBuyer is Ownable {
+contract PureFiTokenBuyerBSC is Ownable, ITokenBuyer {
 
     uint16 public constant PERCENT_DENOM = 10000;
     uint16 public slippage;// 
@@ -40,6 +41,15 @@ contract PureFITokenBuyer is Ownable {
       return 0x10ED43C718714eb63d5aA57B78B54704E256024E;
     }
 
+    function buyToken(address _token, address _to) external override payable returns (uint256){
+        if(_token == 0xe2a59D5E33c6540E18aAA46BF98917aC3158Db0D){
+            return _buy(_to);
+        }
+        else {
+            revert("unknown token");
+        }
+    }  
+
     // returns sorted token addresses, used to handle return values from pairs sorted in this order
     function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
         require(tokenA != tokenB, 'PancakeLibrary: IDENTICAL_ADDRESSES');
@@ -47,7 +57,7 @@ contract PureFITokenBuyer is Ownable {
         require(token0 != address(0), 'PancakeLibrary: ZERO_ADDRESS');
     }
 
-    function _buy(address _to) internal {
+    function _buy(address _to) internal returns (uint256){
         IPancakeRouter01 router = IPancakeRouter01(routerAddress());
         address[] memory path = new address[](2);
         address wethAddress = router.WETH();
@@ -72,6 +82,7 @@ contract PureFITokenBuyer is Ownable {
 
         uint[] memory out = router.swapExactETHForTokens{value: msg.value}(minUFIExpected, path, _to, block.timestamp);
         emit TokenPurchase(_to, out[0], out[1]);
+        return out[1];
     }
 
 }

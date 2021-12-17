@@ -12,7 +12,7 @@ interface IToken {
     function decimals() external view returns(uint8);
 }
 
-contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, ERC2771ContextUpgradeable {
+contract PureFiRoundCrossChain is Initializable, OwnableUpgradeable, PausableUpgradeable, ERC2771ContextUpgradeable {
 
     using SafeERC20Upgradeable for IERC20Upgradeable;
     
@@ -136,19 +136,17 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
         beneficiary = _beneficiary;
     }
 
-    function setTokenX(address _tokenX, uint256 _priceUSDperX, uint256 _totalAmountX) external onlyOwner{
+    function setTokenXData(uint256 _priceUSDperX, uint256 _totalAmountX) external onlyOwner{
         require(roundStatus == Status.New || roundStatus == Status.Active, "The round have ended or is active.");
-        require(IToken(tokenUFI).decimals() >= IToken(_tokenX).decimals(),"Unsupported token decimals");
-        tokenX = _tokenX;
         priceUSDperX = _priceUSDperX;
         totalAmountX = _totalAmountX;
     }
 
-    // function depositToPoolX(uint256 poolX) external onlyOwner {
-    //     require(roundStatus == Status.New || roundStatus == Status.Active, "The round have ended or is active.");
-    //     totalAmountX += poolX;
-    //     IERC20Upgradeable(tokenX).safeTransferFrom(_msgSender(), address(this), poolX);
-    // }
+    function setTokenX(address _tokenX) external onlyOwner{
+        require(roundStatus == Status.New || roundStatus == Status.Active, "The round have ended or is active.");
+        require(IToken(tokenUFI).decimals() >= IToken(_tokenX).decimals(),"Unsupported token decimals");
+        tokenX = _tokenX;
+    }
 
     function withdrawFromPoolX() external onlyOwner {
         require(roundStatus == Status.New || roundStatus == Status.Failed , "The round is active or have ended.");
@@ -221,7 +219,7 @@ contract PureFiRound is Initializable, OwnableUpgradeable, PausableUpgradeable, 
         uint8 deltaDecimals = IToken(tokenUFI).decimals() - IToken(tokenX).decimals();
         priceUSDperUFI = _priceUSDperUFI;
         uint256 depositedTotalInUSD = contractTokenBalanceInUFI * _priceUSDperUFI;
-        uint256 roundHardCapInUSD = totalAmountX * priceUSDperX * (10 ** deltaDecimals);
+        uint256 roundHardCapInUSD = (totalAmountX) * priceUSDperX * (10 ** deltaDecimals);
         if (roundHardCapInUSD <= depositedTotalInUSD) {
             roundStatus = Status.Successful;
             emit SuccessfulRound(priceUSDperX, priceUSDperUFI, totalAmountX, contractTokenBalanceInUFI);

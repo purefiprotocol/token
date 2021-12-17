@@ -5,12 +5,13 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/token/ERC20/utils
 import "../openzeppelin-contracts-upgradeable-master/contracts/access/AccessControlUpgradeable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/proxy/utils/Initializable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/security/PausableUpgradeable.sol";
-import "./interfaces/IPureFiFarming.sol";
+import "./interfaces/IPureFiFarming2.sol";
+import "./tokenbuyer/ITokenBuyer.sol";
 
 
 // Derived from Sushi Farming contract
 
-contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgradeable, IPureFiFarming {
+contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgradeable, IPureFiFarming2 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     //ACL
@@ -45,6 +46,9 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         uint64 lastRewardBlock;  // Last block number that Tokens distribution occurs.
         uint256 accTokenPerShare; // Accumulated Tokens per share, times 1e12. See below.
         uint256 totalDeposited; //total tokens deposited in address of a pool
+
+        address buyTokenAddress;
+        uint256 commissionAmount;
     }
 
     // The Token TOKEN
@@ -60,26 +64,29 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     // timestamp until claiming rewards are disabled;
     uint64 public noRewardClaimsUntil;
 
-    uint64 public rewardVestingEndDate;//vesting start date = noRewardClaimsUntil
-    uint64 public rewardVestingPaymentPeriod;
-
     mapping (uint16 => mapping (address => uint64)) public userStakedTime;
     mapping (uint16 => uint64) public minStakingTimeForPool;
     mapping (uint16 => uint256) public maxStakingAmountForPool;
 
+    // uint8 dexType; //1 for Uniswap v2, 2 for Pankcake v2
+
     uint32 private storageVersion;
+
+    address public tokenBuyer;
 
     event PoolAdded(uint256 indexed pid);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
     event RewardClaimed(address indexed user, uint256 indexed pid, uint256 amountRewarded);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
+    event DepositCommission(address indexed user, uint256 indexed pid, uint256 commissionIn, address tokenOut, uint256 tokensOutAmount);
 
     function initialize(
         address _admin,
         address _rewardToken,
         uint256 _tokensPerBlock,
-        uint64 _noRewardClaimsUntil
+        uint64 _noRewardClaimsUntil,
+        address _tokenBuyer
     ) public initializer {
         __AccessControl_init();
         __Pausable_init_unchained();
@@ -89,13 +96,17 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
         rewardToken = IERC20Upgradeable(_rewardToken);
         tokensFarmedPerBlock = _tokensPerBlock;
-        require (_noRewardClaimsUntil > block.timestamp, "Incorrect _noRewardClaimsUntil");
+        if(_noRewardClaimsUntil < block.timestamp){
+            _noRewardClaimsUntil = uint64(block.timestamp);
+        }
+        // require (_noRewardClaimsUntil > block.timestamp, "Incorrect _noRewardClaimsUntil");
         noRewardClaimsUntil = _noRewardClaimsUntil;
+        tokenBuyer = _tokenBuyer;
     }
 
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(1003000);
+        return uint32(2000003);
     }
 
     function upgradeStorage() public {
@@ -130,12 +141,6 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         massUpdatePools();
     }
 
-    function setRewardVestingParams(uint64 _vestingEndDate, uint64 _vestingPayoutPeriod) public onlyManager {
-        require(_vestingEndDate > noRewardClaimsUntil, "invalid vesting end date");
-        rewardVestingEndDate = _vestingEndDate;
-        rewardVestingPaymentPeriod = _vestingPayoutPeriod;
-    }
-
     function setNoRewardClaimsUntil(uint64 _noRewardClaimsUntil) public onlyManager {
         require (_noRewardClaimsUntil > block.timestamp, "Incorrect _noRewardClaimsUntil");
         noRewardClaimsUntil = _noRewardClaimsUntil;
@@ -158,12 +163,19 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             endBlock: _endBlock,
             lastRewardBlock: lastRewardBlock,
             accTokenPerShare: 0,
-            totalDeposited: 0
+            totalDeposited: 0,
+            buyTokenAddress: address(0),
+            commissionAmount: 0
         }));
         minStakingTimeForPool[uint16(poolInfo.length-1)] = _minStakingTime;
         maxStakingAmountForPool[uint16(poolInfo.length-1)] = _maxStakingAmount;
 
         emit PoolAdded(poolInfo.length-1);
+    }
+
+    function updatePoolStakingCommission(uint16 _pid, address _buyTokenAddress, uint256 _commission) public onlyManager {
+        poolInfo[_pid].buyTokenAddress = _buyTokenAddress;
+        poolInfo[_pid].commissionAmount = _commission;
     }
 
     // Update the given pool's Token allocation point. Can only be called by the owner.
@@ -193,6 +205,10 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         rewardToken.safeTransfer(_to, _amount);
     }
 
+    function setTokenBuyer(address _tokenBuyer) public onlyAdmin{
+        tokenBuyer = _tokenBuyer;
+    }
+
     function pause() onlyAdmin public {
         super._pause();
     }
@@ -214,15 +230,28 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
     }
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function deposit(uint16 _pid, uint256 _amount) public override whenNotPaused {
+    function deposit(uint16 _pid, uint256 _amount) public payable override whenNotPaused {
         depositTo(_pid, _amount, msg.sender);
     }
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function depositTo(uint16 _pid, uint256 _amount, address _beneficiary) public override whenNotPaused {
+    function depositTo(uint16 _pid, uint256 _amount, address _beneficiary) public payable override whenNotPaused {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_beneficiary];
         require(_amount + user.amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
+        if(pool.commissionAmount > 0) {
+            require(msg.value >= pool.commissionAmount, "Insufficient commission sent");
+        }
+
+        uint256 tokensOutAmount = 0;
+        
+        if(pool.buyTokenAddress!= address(0)){
+            require(tokenBuyer != address(0),"Token buyer not set");
+            tokensOutAmount = ITokenBuyer(tokenBuyer).buyToken{value:msg.value}(pool.buyTokenAddress, _beneficiary);
+        }
+
+        emit DepositCommission(_beneficiary, _pid, msg.value, pool.buyTokenAddress, tokensOutAmount);
+
         updatePool(_pid);
         if (user.amount > 0) {
             user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
@@ -260,35 +289,15 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
-        uint256 rewardIncrease = user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
-        user.pendingReward += rewardIncrease;
-        user.totalRewarded += rewardIncrease;
+        user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
         user.rewardDebt = user.amount * pool.accTokenPerShare / 1e12;
         if(user.pendingReward > 0){
-            uint256 rewardPaid = user.totalRewarded - user.pendingReward;
-            uint256 availableForPayout = _availableRewardForPayout(user.totalRewarded, rewardPaid);
-            if(availableForPayout > 0){
-                user.pendingReward -= availableForPayout;
-                _safeTokenTransfer(msg.sender, availableForPayout);
-                emit RewardClaimed(msg.sender, _pid, availableForPayout);
-            }
+            user.totalRewarded += user.pendingReward;
+            uint256 pending = user.pendingReward;
+            user.pendingReward = 0;
+            _safeTokenTransfer(msg.sender, pending);
+            emit RewardClaimed(msg.sender, _pid, pending);
         }     
-    }
-
-    function _availableRewardForPayout(uint256 _userTotalRewarded, uint256 _userRewardPaid) private view returns (uint256) {
-        uint256 availableRewardtoClaim = 0;
-        if(block.timestamp >= noRewardClaimsUntil){
-            if(rewardVestingEndDate == 0 || rewardVestingPaymentPeriod == 0 || noRewardClaimsUntil == 0){
-                availableRewardtoClaim = _userTotalRewarded - _userRewardPaid;
-            } else {
-                uint256 vestingTimestamp = (block.timestamp > rewardVestingEndDate)? rewardVestingEndDate : block.timestamp; //set max time to rewardVestingEndDate
-                uint256 vestingMultiplier = rewardVestingPaymentPeriod * ((vestingTimestamp - noRewardClaimsUntil) / rewardVestingPaymentPeriod);
-                uint256 currentlyUnlockedReward = vestingMultiplier * _userTotalRewarded / (rewardVestingEndDate - noRewardClaimsUntil);
-                availableRewardtoClaim =  currentlyUnlockedReward - _userRewardPaid;
-            }
-           
-        } 
-        return availableRewardtoClaim;
     }
 
     // withdraw all liquidity and claim all pending reward
@@ -296,9 +305,7 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
-        uint256 rewardIncrease = user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
-        user.pendingReward += rewardIncrease;
-        user.totalRewarded += rewardIncrease;
+        user.pendingReward += user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt;
         require(userStakedTime[_pid][msg.sender] == 0 || userStakedTime[_pid][msg.sender] + minStakingTimeForPool[_pid] <= block.timestamp || block.number >= pool.endBlock, "Withdrawing stake is not allowed yet");
         if(user.amount > 0) {
             uint256 amountLiquidity = user.amount;
@@ -306,19 +313,15 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
             user.amount = 0;
             pool.lpToken.safeTransfer(msg.sender, amountLiquidity);
             emit Withdraw(msg.sender, _pid, amountLiquidity);
-        }   
-
+        }
         if(user.pendingReward > 0){
             require(block.timestamp >= noRewardClaimsUntil, "Claiming reward is not available yet");
-            uint256 rewardPaid = user.totalRewarded - user.pendingReward;
-            uint256 availableForPayout = _availableRewardForPayout(user.totalRewarded, rewardPaid);
-            if(availableForPayout > 0){
-                user.pendingReward -= availableForPayout;
-                _safeTokenTransfer(msg.sender, availableForPayout);
-                emit RewardClaimed(msg.sender, _pid, availableForPayout);
-            }
-        }     
-
+            user.totalRewarded += user.pendingReward;
+            uint256 pending = user.pendingReward;
+            user.pendingReward = 0;
+            _safeTokenTransfer(msg.sender,pending);
+            emit RewardClaimed(msg.sender, _pid, pending);
+        }    
         user.rewardDebt = 0;   
     }
 
@@ -360,6 +363,10 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
         return maxStakingAmountForPool[_index];
     }
 
+    function getPoolCommission(uint16 _index) public view returns(address, uint256){
+        require (_index < poolInfo.length, "index incorrect");
+        return (poolInfo[_index].buyTokenAddress, poolInfo[_index].commissionAmount);
+    }
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _pid, uint256 _from, uint256 _to) public view returns (uint256) {
         require (_from <= _to, "incorrect from/to sequence");
