@@ -91,7 +91,7 @@ contract('PureFiFarming', (accounts) => {
 
     it('Farming add pool', async () => {
  
-        await farming.addPool.sendTransaction(toBN(100),pureFiToken.address, farmingStartBlock, farmingEndBlock, toBN(0), true);
+        await farming.addPool.sendTransaction(toBN(100),pureFiToken.address, farmingStartBlock, farmingEndBlock, toBN(0),toBN(100000).mul(decimals), true);
         
         let data = await farming.getPool.call(toBN(0));
         let index=0;
@@ -361,7 +361,7 @@ contract('PureFiFarming', (accounts) => {
 
 
 
-        await farming.updatePoolData.sendTransaction(toBN(0), toBN(100), farmingStartBlock, farmingEndBlock.add(toBN(1)), toBN(0), false);
+        await farming.updatePoolData.sendTransaction(toBN(0), toBN(100), farmingStartBlock, farmingEndBlock.add(toBN(1)), toBN(0), toBN(100000).mul(decimals), false);
         await farming.setTokenPerBlock.sendTransaction(totalRewardPerBlock.mul(toBN(2)));
         await advanceBlock(8);
 

@@ -11,17 +11,14 @@ contract PureFiFixedDatePaymentPlan is PureFiPaymentPlan {
 
   PaymentPlan[] internal paymentPlans;
 
-  uint256 public constant PERCENT_100 = 100_00; // 100% with extra denominator
+  uint256 public constant PERCENT_100 = 10000; // 100% with extra denominator
 
   function addPaymentPlan(uint64[] memory _ts, uint16[] memory _percents) public onlyOwner whenNotPaused{
     require(_ts.length == _percents.length,"array length doesn't match");
     uint16 totalPercent = 0;
-    uint16 prevPercent = 0;
     uint64 prevDate = 0;
     for(uint i = 0; i < _ts.length; i++){
-      require (prevPercent <= _percents[i], "Incorrect percent value");
       require (prevDate <= _ts[i], "Incorrect unlock date value");
-      prevPercent = _percents[i];
       prevDate = _ts[i];
       totalPercent += _percents[i];
     }

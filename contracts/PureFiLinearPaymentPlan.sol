@@ -14,7 +14,7 @@ contract PureFiLinearPaymentPlan is PureFiPaymentPlan {
 
   PaymentPlan[] internal paymentPlans;
   
-  uint256 public constant PERCENT_100 = 100_000000; // 100% with extra denominator
+  uint256 public constant PERCENT_100 = 100000000; // 100% with extra denominator
 
   function addPaymentPlan(uint64 _cliff, uint64 _period, uint64 _initialPayoutPercent, uint64 _periodPayoutPercent) public onlyOwner whenNotPaused {
     require(_periodPayoutPercent > 0, "Incorrect _periodPayoutPercent");
