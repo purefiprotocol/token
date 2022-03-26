@@ -11,6 +11,46 @@ import "./interfaces/IPureFiFarming.sol";
 // Derived from Sushi Farming contract
 
 contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgradeable, IPureFiFarming {
+    /**
+        As mathematical model, farming contract can be described by parametrs with dimentions:
+        1)lpToken
+        2)rewardToken
+        3)block
+        4)allocationPoint
+        5)timestamp
+
+        Annotation "[param]" means the dimention of param.
+        For example: [UserInfo.amount] = lptoken
+
+        param `accTokenPerShare` increase every time when function updatePool() is called.
+        The updatePool is called by functions deposit(),depositTo(),withdraw(),claimReward(),exit().
+        `accTokenPerShare` increases every block by this formula:
+        accTokenPerShare = (multiplier * tokensFarmedPerBlock * pool.allocPoint / totalAllocPoint) * 10**12 / pool.totalDeposited
+        where `multiplier` is difference  current block `block.number` and block, where reward was occured (this block also calls lastBlockReward),
+              `tokensFarmedPerBlock` the amount of tokens that distributes in each block,
+              `pool.allocPoint` the amount of the part of pool where reward tokens are distributed
+              `totalAllocPoint` the sum of all allocation points
+              `pool.totalDeposited` is all lpTokens that are staked in the pool
+        [accTokenPerShare]=([multiplier] * [tokensFarmedPerBlock] * [pool.allocPoint] / [totalAllocPoint]) * [10**12] / [pool.totalDeposited]=
+        =(block * rewardToken/block * allocationPoint / allocationPoint) * 1 /  lpToken = rewardToken/lpToken
+        So, [accTokenPerShare]=rewardToken/lpToken
+
+        param `rewardDept` is user to determine how much the user was farmed when he last time called the 
+        deposit(),depositTo(),withdraw(),claimReward(),exit()
+        `rewardDept` is needed because the pure (user.amount * accTokenPerShare) shows the reward from `startBlock` to `block.number`
+        and if we use (user.amount * accTokenPerShare - rewardDept), we got the reward from block, where user called 
+        functions that change the user.amount or claims reward, to `block.number`.
+        user.pendingReward = user.pendingReward + user.amount * pool.accTokenPerShare / 1e12 - user.rewardDebt
+        [user.pendingReward] = [user.pendingReward] + [user.amount] * [pool.accTokenPerShare] / [1e12] - [user.rewardDebt]=
+        = rewardToken + lpToken * rewardToken/lpToken / 1 - rewardToken = rewardToken + rewardToken - rewardToken = rewardToken
+        So, [user.pendingReward] = rewardToken
+
+        The dimension `timestamp` has parametr `noRewardClaimsUntil`.
+
+     */
+
+
+
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     //ACL
@@ -19,10 +59,10 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     // Info of each user.
     struct UserInfo {
-        uint256 amount;     // How many LP tokens the user has provided.
-        uint256 pendingReward; //how many tokens user was rewarded with, pending to withdraw
-        uint256 totalRewarded; //total amount of tokens rewarded to user
-        uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 amount;         // How many LP tokens the user has provided. [amount]=lpToken
+        uint256 pendingReward;  // how many tokens user was rewarded with, pending to withdraw. [pendingReward]=rewardToken
+        uint256 totalRewarded;  // total amount of tokens rewarded to user [totalRewarded]=rewardToken
+        uint256 rewardDebt;     // Reward debt. See explanation below. [rewardDebt]=rewardToken
         //
         // We do some fancy math here. Basically, any point in time, the amount of Tokens
         // entitled to a user but is pending to be distributed is:
@@ -38,27 +78,27 @@ contract PureFiFarming is Initializable, AccessControlUpgradeable, PausableUpgra
 
     // Info of each pool.
     struct PoolInfo {
-        IERC20Upgradeable lpToken;           // Address of LP token contract.
-        uint64 allocPoint;       // How many allocation points assigned to this pool. Tokens to distribute per block.
-        uint64 startBlock;  // farming start block
-        uint64 endBlock; // farming endBlock
-        uint64 lastRewardBlock;  // Last block number that Tokens distribution occurs.
-        uint256 accTokenPerShare; // Accumulated Tokens per share, times 1e12. See below.
-        uint256 totalDeposited; //total tokens deposited in address of a pool
+        IERC20Upgradeable lpToken;  // Address of LP token contract. 
+        uint64 allocPoint;          // How many allocation points assigned to this pool. Tokens to distribute per block.[allocPoint] = allocationPoint
+        uint64 startBlock;          // farming start block. [startBlock]=block
+        uint64 endBlock;            // farming endBlock. [endBlock]=block
+        uint64 lastRewardBlock;     // Last block number that Tokens distribution occurs. [lastRewardBlock]=block
+        uint256 accTokenPerShare;   // Accumulated Tokens per share, times 1e12. See below. [accTokenPerShare]=rewardToken/lpToken
+        uint256 totalDeposited;     //total tokens deposited in address of a pool. [totalDeposited]=lpToken
     }
 
     // The Token TOKEN
     IERC20Upgradeable public rewardToken;
     // Token tokens created per block.
-    uint256 public tokensFarmedPerBlock;
+    uint256 public tokensFarmedPerBlock; //[tokensFarmedPerBlock]=rewardToken/block
     // Info of each pool.
     PoolInfo[] public poolInfo;
     // Info of each user that stakes LP tokens.
     mapping (uint16 => mapping (address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
-    uint256 public totalAllocPoint = 0;
+    uint256 public totalAllocPoint = 0; //[totalAllocPoint]=allocationPoint
     // timestamp until claiming rewards are disabled;
-    uint64 public noRewardClaimsUntil;
+    uint64 public noRewardClaimsUntil; //[noRewardClaimsUntil]=timestamp
 
     uint64 public rewardVestingEndDate;//vesting start date = noRewardClaimsUntil
     uint64 public rewardVestingPaymentPeriod;
