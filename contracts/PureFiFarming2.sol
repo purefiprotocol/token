@@ -5,13 +5,14 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/token/ERC20/utils
 import "../openzeppelin-contracts-upgradeable-master/contracts/access/AccessControlUpgradeable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/proxy/utils/Initializable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/security/PausableUpgradeable.sol";
-import "./interfaces/IPureFiFarming2.sol";
+import "./interfaces/IPureFiFarming2Verifiable.sol";
 import "./tokenbuyer/ITokenBuyer.sol";
+import "./PureFiContext.sol";
 
 
 // Derived from Sushi Farming contract
 
-contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgradeable, IPureFiFarming2 {
+contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgradeable, IPureFiFarming2Verifiable, PureFiContext  {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     //ACL
@@ -86,10 +87,12 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         address _rewardToken,
         uint256 _tokensPerBlock,
         uint64 _noRewardClaimsUntil,
-        address _tokenBuyer
+        address _tokenBuyer,
+        address _pureFiVerifier
     ) public initializer {
         __AccessControl_init();
         __Pausable_init_unchained();
+        __PureFiContext_init_unchained( _pureFiVerifier);
 
         _setupRole(DEFAULT_ADMIN_ROLE, _admin);
         _setupRole(MANAGER_ROLE, _admin);
@@ -229,13 +232,29 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         _updatePool(_pid);
     }
 
+    /**
+    * @param data - signed data package from the off-chain verifier
+    *    data[0] - verification session ID
+    *    data[1] - rule ID (if required)
+    *    data[2] - verification timestamp
+    *    data[3] - verified wallet - to be the same as msg.sender
+    * @param signature - Off-chain verifier signature
+    */
+
+
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function deposit(uint16 _pid, uint256 _amount) public payable override whenNotPaused {
-        depositTo(_pid, _amount, msg.sender);
+    function deposit(uint16 _pid, uint256 _amount, uint256[] memory data, bytes memory signature) public payable whenNotPaused {
+        depositTo(_pid, _amount, msg.sender, data, signature);
     }
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function depositTo(uint16 _pid, uint256 _amount, address _beneficiary) public payable override whenNotPaused {
+    function depositTo(
+        uint16 _pid,
+         uint256 _amount,
+          address _beneficiary,
+          uint256[] memory data,
+           bytes memory signature
+           ) public payable override whenNotPaused compliesDefaultRule( DefaultRule.KYCAML, msg.sender, data, signature ) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_beneficiary];
         require(_amount + user.amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
@@ -266,8 +285,15 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         emit Deposit(_beneficiary, _pid, _amount);
     }
 
+
     // Withdraw LP tokens from PureFiFarming.
-    function withdraw(uint16 _pid, uint256 _amount) public override whenNotPaused {
+    function withdraw(
+        uint16 _pid,
+         uint256 _amount,
+         uint256[] memory data,
+         bytes memory signature
+         ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+    {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -284,7 +310,13 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     }
 
     // Claim rewarded tokens from PureFiFarming.
-    function claimReward(uint16 _pid) public override whenNotPaused {
+    // Claim rewarded tokens from PureFiFarming.
+    function claimReward(
+        uint16 _pid,
+         uint256[] memory data,
+          bytes memory signature
+          ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+    {
         require(block.timestamp >= noRewardClaimsUntil, "Claiming reward is not available yet");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -301,7 +333,13 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     }
 
     // withdraw all liquidity and claim all pending reward
-    function exit(uint16 _pid) public override whenNotPaused {
+    // withdraw all liquidity and claim all pending reward
+    function exit(
+        uint16 _pid,
+        uint256[] memory data,
+        bytes memory signature
+        ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+    {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
