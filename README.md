@@ -2,7 +2,7 @@
 
 ## Ethereum Mainnet
 
-1. UFI Token contract: [0xcDa4e840411C00a614aD9205CAEC807c7458a0E](https://etherscan.io/token/0xcDa4e840411C00a614aD9205CAEC807c7458a0E3)
+1. UFI Token contract: [0xcDa4e840411C00a614aD9205CAEC807c7458a0E3](https://etherscan.io/token/0xcDa4e840411C00a614aD9205CAEC807c7458a0E3)
 1. Payment Plan contract (Fixed Dates unlock): [0xDeE6e64F14f51BeDD3AB76DBb9DBAD1762c5Ea4b](https://etherscan.io/address/0xDeE6e64F14f51BeDD3AB76DBb9DBAD1762c5Ea4b)
 1. Payment Plan contract (Linear unlock): [0xF9da2dE9E04561f69AB770a846eE7DDCfc2c53F6](https://etherscan.io/address/0xF9da2dE9E04561f69AB770a846eE7DDCfc2c53F6)
 1. Farming contract: [0xafAb7848AaB0F9EEF9F9e29a83BdBBBdDE02ECe5](https://etherscan.io/address/0xafAb7848AaB0F9EEF9F9e29a83BdBBBdDE02ECe5)
