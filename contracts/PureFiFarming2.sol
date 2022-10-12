@@ -287,12 +287,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
 
 
     // Withdraw LP tokens from PureFiFarming.
-    function withdraw(
-        uint16 _pid,
-         uint256 _amount,
-         uint256[] memory data,
-         bytes memory signature
-         ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+    function withdraw( uint16 _pid, uint256 _amount) public override whenNotPaused
     {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -310,12 +305,8 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     }
 
     // Claim rewarded tokens from PureFiFarming.
-    // Claim rewarded tokens from PureFiFarming.
-    function claimReward(
-        uint16 _pid,
-         uint256[] memory data,
-          bytes memory signature
-          ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+
+    function claimReward( uint16 _pid ) public override whenNotPaused
     {
         require(block.timestamp >= noRewardClaimsUntil, "Claiming reward is not available yet");
         PoolInfo storage pool = poolInfo[_pid];
@@ -334,11 +325,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
 
     // withdraw all liquidity and claim all pending reward
     // withdraw all liquidity and claim all pending reward
-    function exit(
-        uint16 _pid,
-        uint256[] memory data,
-        bytes memory signature
-        ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+    function exit( uint16 _pid ) public override whenNotPaused
     {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
