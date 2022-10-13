@@ -62,12 +62,22 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     mapping (uint16 => mapping (address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
+     // Amount of users
+    uint256 usersAmount;
     // timestamp until claiming rewards are disabled;
     uint64 public noRewardClaimsUntil;
 
     mapping (uint16 => mapping (address => uint64)) public userStakedTime;
     mapping (uint16 => uint64) public minStakingTimeForPool;
     mapping (uint16 => uint256) public maxStakingAmountForPool;
+
+    // PersonId to UserAddress 
+    mapping(uint => address) idToAddress;
+    // Accordance between user address and Id
+    mapping(address => uint) addressToId;
+    // Accordance between user and amount of deposited pools
+    mapping (address => uint16) addressToPools;
+
 
     // uint8 dexType; //1 for Uniswap v2, 2 for Pankcake v2
 
@@ -255,6 +265,9 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
           uint256[] memory data,
            bytes memory signature
            ) public payable override whenNotPaused compliesDefaultRule( DefaultRule.KYCAML, msg.sender, data, signature ) {
+
+        _checkUserRegistration(_pid, _beneficiary);
+
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_beneficiary];
         require(_amount + user.amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
@@ -302,6 +315,11 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
             emit Withdraw(msg.sender, _pid, _amount);
         }
         user.rewardDebt = user.amount * pool.accTokenPerShare / 1e12;   
+
+        // update info about user id and pools 
+        if ( user.amount == _amount ){
+            _updateUserIndex(msg.sender);
+        }
     }
 
     // Claim rewarded tokens from PureFiFarming.
@@ -348,6 +366,10 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
             emit RewardClaimed(msg.sender, _pid, pending);
         }    
         user.rewardDebt = 0;   
+
+         // update info about user id and pools 
+        _updateUserIndex(msg.sender);
+    
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
@@ -360,6 +382,9 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         user.rewardDebt = 0;
         pool.lpToken.safeTransfer(address(msg.sender), amount);
         emit EmergencyWithdraw(msg.sender, _pid, amount);
+
+        // update info about user id and pools 
+        _updateUserIndex(msg.sender);
     }
 
     //************* VIEW FUNCTIONS ********************************
@@ -421,6 +446,18 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         return userStakedTime[_pid][_user];
     }
 
+    function getAddressById( uint256 _id ) external view returns (address){
+        return _getAddressById(_id);
+    }
+
+    function getAddressByIds( uint256[] memory _ids ) external view returns(address[] memory) {
+        address[] memory users = new address[](_ids.length);
+
+        for( uint i = 0; i < _ids.length; i++){
+            users[i] = idToAddress[_ids[i]];
+        }
+        return users;
+    }
     //************* INTERNAL FUNCTIONS ********************************
 
     // Safe rewardToken transfer function, just in case if rounding error causes pool to not have enough Tokens.
@@ -454,5 +491,79 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         uint256 amountRewardedPerPool = totalAllocPoint > 0 ? (multiplier * tokensFarmedPerBlock * pool.allocPoint / totalAllocPoint) : 0;
         pool.accTokenPerShare += amountRewardedPerPool * 1e12 / pool.totalDeposited;
         pool.lastRewardBlock = uint64(block.number);
+    }
+
+    function _getAddressById( uint256 _id ) internal view returns (address){
+        return idToAddress[_id];
+    }
+
+    function _addUser( address _newUser ) internal {
+        usersAmount++;
+        uint256 index = usersAmount;
+        idToAddress[index] = _newUser;
+        addressToId[_newUser] = index;
+        addressToPools[_newUser] = 1;
+    }
+
+    function _addPool( address _user ) internal {
+        addressToPools[_user] += 1;
+    }
+
+    function _isRegistered( address _user ) internal view returns (bool){
+        if ( addressToId[_user] == 0 ){
+            return false;
+        }else{
+            return true;
+        }
+    }
+
+    function _checkUserRegistration( uint16 _pid, address _user ) internal{
+        UserInfo memory user = userInfo[_pid][_user];
+        // check if it is first deposit to this pool
+        if( user.amount == 0 ){
+            if( !_isRegistered(_user) ){
+                _addUser(_user);
+            }else{
+                _addPool(_user);
+            }
+        }
+    }
+
+    function _updateUserIndex( address _user ) internal{
+        if( addressToPools[_user] == 1 ){
+            _removeUser(_user);
+        }else{
+            _removePool(_user);
+        }
+    }
+
+    function _removeUser( address _user ) internal{
+        uint256 removedUserId = addressToId[_user];
+
+        _reorderId(removedUserId);
+
+        usersAmount -= 1;
+        delete addressToId[_user];
+        delete addressToPools[_user];
+        
+    }
+
+    function _removePool( address _user ) internal {
+        addressToPools[_user] -= 1;
+    }
+
+    function _lastUserIndex() internal view returns (uint256){
+        return usersAmount;
+    }
+
+    function _reorderId( uint256 _removedId ) internal {
+        if ( _removedId != _lastUserIndex()) {
+            address lastIndexUser = idToAddress[_lastUserIndex()];
+            idToAddress[_removedId] = lastIndexUser;
+            delete idToAddress[_lastUserIndex()];
+            addressToId[lastIndexUser] = _removedId;
+        }else{
+            delete idToAddress[_removedId];
+        }
     }
 }
