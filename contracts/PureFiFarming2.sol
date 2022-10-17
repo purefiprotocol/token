@@ -61,7 +61,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     // Info of each user that stakes LP tokens.
     mapping (uint16 => mapping (address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
-    uint256 public totalAllocPoint = 0;
+    uint256 public totalAllocPoint;
      // Amount of users
     uint256 usersAmount;
     // timestamp until claiming rewards are disabled;
@@ -264,7 +264,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
           address _beneficiary,
           uint256[] memory data,
            bytes memory signature
-           ) public payable override whenNotPaused compliesDefaultRule( DefaultRule.KYCAML, msg.sender, data, signature ) {
+           ) public payable override whenNotPaused compliesCustomRule( data[1], msg.sender, data, signature ) {
 
         _checkUserRegistration(_pid, _beneficiary);
 
@@ -457,6 +457,10 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
             users[i] = idToAddress[_ids[i]];
         }
         return users;
+    }
+
+    function getUsersAmount() external view returns (uint256){
+        return usersAmount;
     }
     //************* INTERNAL FUNCTIONS ********************************
 
