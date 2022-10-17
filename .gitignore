@@ -77,3 +77,24 @@ Thumbs.db
 *.mov
 *.wmv
 *.code-workspace
+
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+#Hardhat files
+cache
+artifacts
+
+chainlink/contracts/src/*
+!chainlink/contracts/src/v0.8
+
+/chainlink/contracts/src/v0.8/*
+!chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol
+
+!chainlink/contracts/src/v0.8/interfaces
+/chainlink/contracts/src/v0.8/interfaces/*
+!chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol
