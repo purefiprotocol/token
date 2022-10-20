@@ -8,15 +8,24 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/proxy/utils/Initi
 import "../openzeppelin-contracts-upgradeable-master/contracts/access/OwnableUpgradeable.sol";
 import "../contracts/interfaces/IPureFiFarming2Verifiable.sol";
 import "../openzeppelin-contracts-upgradeable-master/contracts/token/ERC20/IERC20Upgradeable.sol";
+import "../chainlink/contracts/src/v0.8/AutomationCompatible.sol";
+import "../contracts/interfaces/IProfitDistributor.sol";
 
 contract ProfitDistributor is
     Initializable,
     OwnableUpgradeable,
-    VRFConsumerBaseV2
+    VRFConsumerBaseV2,
+    AutomationCompatible,
+    IProfitDistributor
 {
     event RequestSent(uint256 requestId, uint32 numWords);
     event RequestFulfilled(uint256 requestId, uint256[] randomWords);
     event ProfitDistributed(address recepient, uint256 amount);
+
+    struct WinInfo{
+        uint64 timestamp;
+        uint256 amount;
+    }
 
     uint256 lastRequestId;
     uint256[] randomWords;
@@ -31,8 +40,20 @@ contract ProfitDistributor is
 
     IERC20Upgradeable pureFiToken;
 
+    address subscriptionService;
+    // address of keeper
+    address keeper; 
+
     uint16 requestConfirmation;
-    
+
+    // true - if random words were gotten
+    bool randomWordsFullfilledStatus; 
+    // true - if request was sent, but random words were not received yet
+    bool randomWordsPendingStatus;
+    // true - if subscription service distributed profit
+    bool distributionReadiness;
+    // store the latest user win
+    mapping (address => WinInfo) winners;
     // gas lane to use;
     // see for more info : https://docs.chain.link/docs/vrf/v2/subscription/supported-networks/#configurations
     bytes32 keyHash;
@@ -45,7 +66,8 @@ contract ProfitDistributor is
         uint16 _requestConfirmation,
         uint32 _numWords,
         address _farmingContract,
-        address _pureFiToken
+        address _pureFiToken,
+        address _subService
     ) public initializer {
         __VRFConsumerBaseV2_init(_vrfCoordinator);
         __Ownable_init();
@@ -58,10 +80,20 @@ contract ProfitDistributor is
         numWords = _numWords;
         farmingContract = IPureFiFarming2Verifiable(_farmingContract);
         pureFiToken = IERC20Upgradeable(_pureFiToken);
+        subscriptionService = _subService;
 
     }
 
-    function requestRandomWords() external onlyOwner returns (uint256 requestId){
+    function setKeeper(address _keeper) external onlyOwner{
+        keeper = _keeper;
+    }
+
+    // request random words manually
+    function requestRandomWords() public onlyOwner returns (uint256 requestId){
+        return _requestRandomWords();
+    }
+
+    function _requestRandomWords() internal returns (uint256 requestId){
         requestId = COORDINATOR.requestRandomWords(
             keyHash,
             subscriptionId,
@@ -70,6 +102,7 @@ contract ProfitDistributor is
             numWords
         );
         lastRequestId = requestId;
+        randomWordsPendingStatus = true;
         emit RequestSent( requestId, numWords );
         return requestId;
     }
@@ -79,35 +112,76 @@ contract ProfitDistributor is
         randomWords = _randomWords;
 
         emit RequestFulfilled(_requestId, _randomWords);
+        randomWordsFullfilledStatus = true;
+        randomWordsPendingStatus = false;
     }
 
-    function distributeProfit() external {
-        //TODO: add modifier;
-        uint256 userAmount = farmingContract.getUsersAmount();
-        uint256[] memory normalizedNumbers;
-        for(uint i = 0; i < randomWords.length; i++){
-            normalizedNumbers[i] = randomWords[i] % userAmount + 1;
-        }
-        address[] memory winners = farmingContract.getAddressByIds( normalizedNumbers );
+    // distributeProfit manually
+    function distributeProfit() external onlyOwner {
+        _distributeProfit();
+    }
 
-        require(normalizedNumbers.length == 3, 'Incorrect amount of users');
+    function _distributeProfit() internal {
+        uint256 userAmount = farmingContract.getUsersAmount();
+        uint256 winnerNumber = randomWords[0] % userAmount + 1;
+        address winner = farmingContract.getAddressById(winnerNumber);
+
         uint256 contractBalance = pureFiToken.balanceOf(address(this));
 
-        uint256 firstReward = contractBalance * 6 / 10;
-        uint256 secondReward = contractBalance * 3 / 10;
-        uint256 thirdReward = contractBalance / 10;
+        bool res = pureFiToken.transferFrom(subscriptionService, winner, contractBalance);
+        require(res == true, "ProfitDistributor : transferFrom error");
 
-        pureFiToken.transfer(winners[0], firstReward);
-        pureFiToken.transfer(winners[1], secondReward);
-        pureFiToken.transfer(winners[2], thirdReward);
+        // add info about winner
+        winners[winner] = WinInfo({timestamp : uint64(block.timestamp), amount : contractBalance});
 
-        emit ProfitDistributed(winners[0], firstReward);
-        emit ProfitDistributed(winners[1], secondReward);
-        emit ProfitDistributed(winners[2], thirdReward);
+        emit ProfitDistributed(winner, contractBalance);
+        
         delete randomWords;
+        randomWordsFullfilledStatus = false;
+        distributionReadiness = false;
+
     }
 
     function getRandomWords() external view returns (uint256[] memory){
         return randomWords;
     }
+    function getWinInfo( address _user) external view returns(uint64 timestamp, uint256 amount){
+        WinInfo memory info = winners[_user];
+        timestamp = info.timestamp;
+        amount = info.amount;
+    }
+
+    function checkUpkeep(bytes calldata checkData) external returns (bool upkeepNeeded, bytes memory performData){
+        if( distributionReadiness == true ){
+            if(randomWordsFullfilledStatus == false && randomWordsPendingStatus == false){
+                upkeepNeeded = true;
+            }else if ( randomWordsFullfilledStatus == true && randomWordsPendingStatus == false ){
+                upkeepNeeded = true;
+            }
+        }
+    }
+
+    function performUpkeep(bytes calldata performData) external{
+        _isKeeper();
+        require( distributionReadiness == true, "Incorrect readiness status" );
+
+        if( randomWordsFullfilledStatus == false && randomWordsPendingStatus == false ){
+            _requestRandomWords();
+        }else if(randomWordsFullfilledStatus == true && randomWordsPendingStatus == false){
+            _distributeProfit();
+        }
+    }
+    function _isKeeper() internal view {
+        require(msg.sender == keeper, "Unauthorized");
+    }
+
+    function setDistributionReadinessFlag() external {
+        _isSubService();
+        distributionReadiness = true;
+    }
+
+    function _isSubService() internal view {
+        require(msg.sender == subscriptionService, "Unauthorized");
+    }
+
 }

@@ -94,7 +94,10 @@ chainlink/contracts/src/*
 
 /chainlink/contracts/src/v0.8/*
 !chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol
+!chainlink/contracts/src/v0.8/AutomationCompatible.sol
+!chainlink/contracts/src/v0.8/AutamationBase.sol
 
 !chainlink/contracts/src/v0.8/interfaces
 /chainlink/contracts/src/v0.8/interfaces/*
 !chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol
+!chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol
