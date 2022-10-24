@@ -128,7 +128,7 @@ contract ProfitDistributor is
 
         uint256 contractBalance = pureFiToken.balanceOf(address(this));
 
-        bool res = pureFiToken.transferFrom(subscriptionService, winner, contractBalance);
+        bool res = pureFiToken.transfer(winner, contractBalance);
         require(res == true, "ProfitDistributor : transferFrom error");
 
         // add info about winner
@@ -162,7 +162,6 @@ contract ProfitDistributor is
     }
 
     function performUpkeep(bytes calldata performData) external{
-        _isKeeper();
         require( distributionReadiness == true, "Incorrect readiness status" );
 
         if( randomWordsFullfilledStatus == false && randomWordsPendingStatus == false ){
@@ -170,9 +169,6 @@ contract ProfitDistributor is
         }else if(randomWordsFullfilledStatus == true && randomWordsPendingStatus == false){
             _distributeProfit();
         }
-    }
-    function _isKeeper() internal view {
-        require(msg.sender == keeper, "Unauthorized");
     }
 
     function setDistributionReadinessFlag() external {
@@ -182,6 +178,14 @@ contract ProfitDistributor is
 
     function _isSubService() internal view {
         require(msg.sender == subscriptionService, "Unauthorized");
+    }
+
+    function getSubscriptionService() external view returns(address){
+        return subscriptionService;
+    }
+
+    function setSubscriptionService(address _newSubService) external onlyOwner{
+        subscriptionService = _newSubService;
     }
 
 }
