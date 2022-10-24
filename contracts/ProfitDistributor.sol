@@ -84,10 +84,6 @@ contract ProfitDistributor is
 
     }
 
-    function setKeeper(address _keeper) external onlyOwner{
-        keeper = _keeper;
-    }
-
     // request random words manually
     function requestRandomWords() public onlyOwner returns (uint256 requestId){
         return _requestRandomWords();
