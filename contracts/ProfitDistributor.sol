@@ -182,4 +182,8 @@ contract ProfitDistributor is
         subscriptionService = _newSubService;
     }
 
+    function setSubscriptionId(uint64 _newId) external onlyOwner{
+        subscriptionId = _newId;
+    }
+
 }
