@@ -2,14 +2,14 @@ import { ethers, upgrades } from "hardhat";
 import hre from "hardhat";
 import { BigNumber } from "ethers";
 
-const ADMIN = "";
-const TOKEN = "";
+const ADMIN = "0x1e1Baf37B7C89341DEdd688CE74785A703e2e0E3";
+const TOKEN = "0xe2a59D5E33c6540E18aAA46BF98917aC3158Db0D"; // BSC PureFiToken address
 const TOKENS_PER_BLOCK = BigNumber.from("308641975308642000");
-const NO_REWARD_CLAIMS_UNTIL = "";
-const TOKEN_BUYER = "";
-const VERIFIER = "";
+const NO_REWARD_CLAIMS_UNTIL = 1666872000; // Thursday 27.10.22 12:00 GMT
+const TOKEN_BUYER = "0x2979aC1a340470887f42F0cbDD2642599D15De81";
+const VERIFIER = "0x3346cc4b6F44349EAC447b1C8392b2a472a20F27";
 
-const SUBSCRIPTION_SERVICE = "";
+const SUBSCRIPTION_SERVICE = "0xBbC3Df0Af62b4a469DD44c1bc4e8804268dB1ea3";
 
 const START_BLOCK = 21800000;
 const END_BLOCK = 23500000;
@@ -34,10 +34,15 @@ async function main() {
 
     // deploy proxyAdmin 
     const proxyAdmin = await PPROXY_ADMIN.deploy();
+    await proxyAdmin.deployed();
+    
     console.log("Proxy admin address : ", proxyAdmin.address);
 
     // deploy farming master copy
     const farmingMasterCopy = await FARMING.deploy();
+    await farmingMasterCopy.deployed();
+
+    console.log("Farming Master copy address : ", farmingMasterCopy.address);
     let proxyAddress : string;
     {
         // deploy farming
@@ -46,6 +51,7 @@ async function main() {
             proxyAdmin.address,
             ethers.utils.toUtf8Bytes("0x")
         );
+        await farming.deployed();
         proxyAddress = farming.address;
         console.log("Farming address : ", farming.address);
 
@@ -66,14 +72,19 @@ async function main() {
     // deploy ProfitDistributor master copy
 
     const distributorMasterCopy = await PROFIT_DISTRIBUTOR.deploy();
+    await distributorMasterCopy.deployed();
+
+    console.log("Master copy address :", distributorMasterCopy.address);
     let distributorProxyAddress : string;
     {
         // deploy profitDistributor
         const distributor = await PPROXY.deploy(
             distributorMasterCopy.address,
             proxyAdmin.address,
-            ethers.utils.toUtf8Bytes("0x")
+            "0x"
         );
+        await distributor.deployed();
+        
         distributorProxyAddress = distributor.address;
         console.log("ProfitDistributor address :", distributorProxyAddress);
     }
