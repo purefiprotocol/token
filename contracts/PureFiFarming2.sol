@@ -117,9 +117,16 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         tokenBuyer = _tokenBuyer;
     }
 
+    /*
+        Changelog:
+        2000003 -> 2000004
+            * Add verification for deposit
+            * Add functionality for user identification
+    */
+
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(2000003);
+        return uint32(2000004);
     }
 
     function upgradeStorage() public {
