@@ -41,8 +41,6 @@ contract ProfitDistributor is
     IERC20Upgradeable pureFiToken;
 
     address subscriptionService;
-    // address of keeper
-    address keeper; 
 
     uint16 requestConfirmation;
 
