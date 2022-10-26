@@ -117,7 +117,15 @@ contract ProfitDistributor is
 
     function _distributeProfit() internal {
         uint256 userAmount = farmingContract.getUsersAmount();
-        uint256 winnerNumber = randomWords[0] % userAmount + 1;
+
+        require(userAmount != 0, "ProfitDistributor : Farming user amount can not be zero");
+        
+        uint256 winnerNumber;
+        if( userAmount == 1 ){
+            winnerNumber = 1;
+        }else{
+            winnerNumber = randomWords[0] % userAmount + 1;
+        }
         address winner = farmingContract.getAddressById(winnerNumber);
 
         uint256 contractBalance = pureFiToken.balanceOf(address(this));
