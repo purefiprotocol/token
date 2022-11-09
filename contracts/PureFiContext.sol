@@ -4,8 +4,10 @@ pragma solidity ^0.8.0;
 
 import "../openzeppelin-contracts-upgradeable-master/contracts/proxy/utils/Initializable.sol";
 import "./interfaces/IPureFiVerifier.sol";
+import "./ContextCompatible.sol";
 
-abstract contract PureFiContext is Initializable{
+
+abstract contract PureFiContext is Initializable, ContextCompatible{
 
     enum DefaultRule {NONE, KYC, AML, KYCAML} 
     
@@ -31,10 +33,13 @@ abstract contract PureFiContext is Initializable{
     }
 
     modifier requiresOnChainKYC(address user){
-        uint256[] memory data = new uint256[](4);
+
+        uint256[] memory data = new uint256[](1);
+        data[0] = uint256(uint160(user));
         bytes memory signature;
-        (_txLocalCheckResult, _txLocalCheckReason) = pureFiVerifier.defaultKYCCheck(user, data, signature);
-        require(_txLocalCheckResult == _VERIFICATION_SUCCESS, _txLocalCheckReason);
+        VerificationData memory verificationData;
+        (verificationData, _txLocalCheckResult) = pureFiVerifier.defaultKYCCheck(data, signature);
+        require(_txLocalCheckResult == _VERIFICATION_SUCCESS, "PureFi Context : DefaultKYCCheck fail");
         //here the smart contract can decide whether to fail a transaction in case of check failed
 
         _;
@@ -46,20 +51,23 @@ abstract contract PureFiContext is Initializable{
     }
 
 
-    modifier compliesDefaultRule(DefaultRule rule, address expectedFundsSender, uint256[] memory data, bytes memory signature) {
+    modifier compliesDefaultRule(DefaultRule rule, uint256[] memory data, bytes memory signature) {
+
+        VerificationData memory verificationData;
         // set context variable
         if(rule == DefaultRule.NONE){
             _txLocalCheckResult = _VERIFICATION_SUCCESS;
         } else {
             if(rule == DefaultRule.KYC){
-                (_txLocalCheckResult, _txLocalCheckReason) = pureFiVerifier.defaultKYCCheck(expectedFundsSender, data, signature);
+                (verificationData, _txLocalCheckResult) = pureFiVerifier.defaultKYCCheck(data, signature);
             } else if (rule == DefaultRule.AML){
-                (_txLocalCheckResult, _txLocalCheckReason) = pureFiVerifier.defaultAMLCheck(expectedFundsSender, data, signature);
+                (verificationData, _txLocalCheckResult) = pureFiVerifier.defaultAMLCheck(data, signature);
             } else if (rule == DefaultRule.KYCAML){
-                (_txLocalCheckResult, _txLocalCheckReason) = pureFiVerifier.defaultKYCAMLCheck(expectedFundsSender, data, signature);
+                (verificationData, _txLocalCheckResult) = pureFiVerifier.defaultKYCAMLCheck(data, signature);
             }
-            require(_txLocalCheckResult == _VERIFICATION_SUCCESS, _txLocalCheckReason);
+            require(_txLocalCheckResult == _VERIFICATION_SUCCESS, "PureFi Context : compliesDefaultRule fail");
         }
+        _saveVerificationData(verificationData);
         
         //here the smart contract can decide whether to fail a transaction in case of check failed
 
@@ -69,12 +77,14 @@ abstract contract PureFiContext is Initializable{
         // https://eips.ethereum.org/EIPS/eip-2200)
         _txLocalCheckResult = _NOT_VERIFIED;
         _txLocalCheckReason = _NOT_VERIFIED_REASON;
+        _removeVerificationData();
     }
 
-    modifier compliesCustomRule(uint256 expectedRuleID, address expectedFundsSender, uint256[] memory data, bytes memory signature) {
-
-        (_txLocalCheckResult, _txLocalCheckReason) = pureFiVerifier.verifyAgainstRule(expectedFundsSender, expectedRuleID, data, signature);
-        require(_txLocalCheckResult == _VERIFICATION_SUCCESS, _txLocalCheckReason);
+    modifier compliesCustomRule(uint256[] memory data, bytes memory signature) {
+        VerificationData memory verificationData;
+        ( verificationData, _txLocalCheckResult) = pureFiVerifier.verifyAgainstRule(data, signature);
+        _saveVerificationData(verificationData);
+        require(_txLocalCheckResult == _VERIFICATION_SUCCESS, "Context : Verification failed");
         
         //here the smart contract can decide whether to fail a transaction in case of check failed
 
@@ -84,6 +94,7 @@ abstract contract PureFiContext is Initializable{
         // https://eips.ethereum.org/EIPS/eip-2200)
         _txLocalCheckResult = _NOT_VERIFIED;
         _txLocalCheckReason = _NOT_VERIFIED_REASON;
+        _removeVerificationData();
     }
 
 }

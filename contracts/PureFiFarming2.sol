@@ -85,6 +85,9 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
 
     address public tokenBuyer;
 
+    // temporary storage for verification performing;
+    VerificationData verificationData;
+
     event PoolAdded(uint256 indexed pid);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
@@ -271,11 +274,20 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
           address _beneficiary,
           uint256[] memory data,
            bytes memory signature
-           ) public payable override whenNotPaused compliesCustomRule( data[1], msg.sender, data, signature ) {
+           ) public payable override whenNotPaused compliesCustomRule( data, signature ) {
 
         _checkUserRegistration(_pid, _beneficiary);
 
         PoolInfo storage pool = poolInfo[_pid];
+        // validate received verificationData
+
+        VerificationData memory dataPack = _getLocalVerificationData();
+        require(dataPack.from == msg.sender, "PureFiFarming : Sender matching error");
+        require(dataPack.to == _beneficiary, "PureFiFarming : Beneficiary matching error");
+        require(dataPack.amount == _amount, "PureFiFarming : Amount matching error");
+        require(dataPack.token == address(pool.lpToken), "PureFiFarming : LPToken matching error");
+
+        
         UserInfo storage user = userInfo[_pid][_beneficiary];
         require(_amount + user.amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
         if(pool.commissionAmount > 0) {
@@ -576,5 +588,18 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         }else{
             delete idToAddress[_removedId];
         }
+    }
+
+    // ContextCompatible methods
+    function _saveVerificationData( VerificationData memory _verificationData ) internal override{
+        verificationData = _verificationData;
+    }
+
+    function _removeVerificationData() internal override{
+        delete verificationData;
+    }
+
+    function _getLocalVerificationData() internal view override returns ( VerificationData memory ){
+        return verificationData;
     }
 }
