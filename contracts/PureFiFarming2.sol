@@ -86,7 +86,6 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     address public tokenBuyer;
 
     // temporary storage for verification performing;
-    VerificationData verificationData;
 
     event PoolAdded(uint256 indexed pid);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
@@ -252,19 +251,9 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         _updatePool(_pid);
     }
 
-    /**
-    * @param data - signed data package from the off-chain verifier
-    *    data[0] - verification session ID
-    *    data[1] - rule ID (if required)
-    *    data[2] - verification timestamp
-    *    data[3] - verified wallet - to be the same as msg.sender
-    * @param signature - Off-chain verifier signature
-    */
-
-
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function deposit(uint16 _pid, uint256 _amount, uint256[] memory data, bytes memory signature) public payable whenNotPaused {
-        depositTo(_pid, _amount, msg.sender, data, signature);
+    function deposit(uint16 _pid, uint256 _amount, bytes calldata _purefidata) public payable whenNotPaused {
+        depositTo(_pid, _amount, msg.sender, _purefidata);
     }
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
@@ -272,20 +261,15 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         uint16 _pid,
          uint256 _amount,
           address _beneficiary,
-          uint256[] memory data,
-           bytes memory signature
-           ) public payable override whenNotPaused compliesCustomRule( data, signature ) {
+            bytes calldata _purefidata
+           ) public payable override whenNotPaused withDefaultAddressVerification(DefaultRule.AML, msg.sender, _purefidata) {
 
         _checkUserRegistration(_pid, _beneficiary);
 
         PoolInfo storage pool = poolInfo[_pid];
         // validate received verificationData
 
-        VerificationData memory dataPack = _getLocalVerificationData();
-        require(dataPack.from == msg.sender, "PureFiFarming : Sender matching error");
-        require(dataPack.to == _beneficiary, "PureFiFarming : Beneficiary matching error");
-        require(dataPack.amount == _amount, "PureFiFarming : Amount matching error");
-        require(dataPack.token == address(pool.lpToken), "PureFiFarming : LPToken matching error");
+        require(getVerificationPackage().from == msg.sender, "PureFiFarming : Sender matching error");
 
         
         UserInfo storage user = userInfo[_pid][_beneficiary];
@@ -590,16 +574,4 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         }
     }
 
-    // ContextCompatible methods
-    function _saveVerificationData( VerificationData memory _verificationData ) internal override{
-        verificationData = _verificationData;
-    }
-
-    function _removeVerificationData() internal override{
-        delete verificationData;
-    }
-
-    function _getLocalVerificationData() internal view override returns ( VerificationData memory ){
-        return verificationData;
-    }
 }
