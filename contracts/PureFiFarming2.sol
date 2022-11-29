@@ -8,6 +8,7 @@ import "../openzeppelin-contracts-upgradeable-master/contracts/security/Pausable
 import "./interfaces/IPureFiFarming2Verifiable.sol";
 import "./tokenbuyer/ITokenBuyer.sol";
 import "./PureFiContext.sol";
+import "./interfaces/IPureFiVerifier.sol";
 
 
 // Derived from Sushi Farming contract
@@ -86,7 +87,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     address public tokenBuyer;
 
     // temporary storage for verification performing;
-    VerificationData verificationData;
+    VerificationPackage verificationPackage;
 
     event PoolAdded(uint256 indexed pid);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
@@ -125,11 +126,14 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         2000003 -> 2000004
             * Add verification for deposit
             * Add functionality for user identification
+        2000004 -> 2000005
+            * Update for the latest verifier version
+            * 3 additional function added for correct work with storage
     */
 
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(2000004);
+        return uint32(2000005);
     }
 
     function upgradeStorage() public {
@@ -252,19 +256,10 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         _updatePool(_pid);
     }
 
-    /**
-    * @param data - signed data package from the off-chain verifier
-    *    data[0] - verification session ID
-    *    data[1] - rule ID (if required)
-    *    data[2] - verification timestamp
-    *    data[3] - verified wallet - to be the same as msg.sender
-    * @param signature - Off-chain verifier signature
-    */
-
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function deposit(uint16 _pid, uint256 _amount, uint256[] memory data, bytes memory signature) public payable whenNotPaused {
-        depositTo(_pid, _amount, msg.sender, data, signature);
+    function deposit(uint16 _pid, uint256 _amount, uint256 _ruleId, bytes calldata _purefidata) public payable whenNotPaused {
+        depositTo(_pid, _amount, msg.sender, _ruleId, _purefidata);
     }
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
@@ -272,20 +267,19 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         uint16 _pid,
          uint256 _amount,
           address _beneficiary,
-          uint256[] memory data,
-           bytes memory signature
-           ) public payable override whenNotPaused compliesCustomRule( data, signature ) {
+          uint256 _ruleId,
+          bytes calldata _purefidata
+           ) public payable override whenNotPaused withCustomAddressVerification(_ruleId, msg.sender,  _purefidata) {
 
         _checkUserRegistration(_pid, _beneficiary);
 
         PoolInfo storage pool = poolInfo[_pid];
         // validate received verificationData
 
-        VerificationData memory dataPack = _getLocalVerificationData();
-        require(dataPack.from == msg.sender, "PureFiFarming : Sender matching error");
-        require(dataPack.to == _beneficiary, "PureFiFarming : Beneficiary matching error");
-        require(dataPack.amount == _amount, "PureFiFarming : Amount matching error");
-        require(dataPack.token == address(pool.lpToken), "PureFiFarming : LPToken matching error");
+        require(_getLocalVerificationPackage().from == msg.sender, "PureFiFarming : Sender matching error");
+        require(_getLocalVerificationPackage().to == _beneficiary, "PureFiFarming : Beneficiary matching error");
+        require(_getLocalVerificationPackage().amount == _amount, "PureFiFarming : Amount matching error");
+        require(_getLocalVerificationPackage().token == address(pool.lpToken), "PureFiFarming : LPToken matching error");
 
         
         UserInfo storage user = userInfo[_pid][_beneficiary];
@@ -591,15 +585,15 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     }
 
     // ContextCompatible methods
-    function _saveVerificationData( VerificationData memory _verificationData ) internal override{
-        verificationData = _verificationData;
+    function _saveVerificationPackage( VerificationPackage memory _verificationPackage ) internal override{
+        verificationPackage = _verificationPackage;
     }
 
-    function _removeVerificationData() internal override{
-        delete verificationData;
+    function _removeVerificationPackage() internal override{
+        delete verificationPackage;
     }
 
-    function _getLocalVerificationData() internal view override returns ( VerificationData memory ){
-        return verificationData;
+    function _getLocalVerificationPackage() internal view override returns ( VerificationPackage memory ){
+        return verificationPackage;
     }
 }
