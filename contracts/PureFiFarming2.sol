@@ -596,4 +596,8 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     function _getLocalVerificationPackage() internal view override returns ( VerificationPackage memory ){
         return verificationPackage;
     }
+
+    function setVerifier( address _newVerifier ) external onlyAdmin{
+        _setVerifier(_newVerifier);
+    }
 }

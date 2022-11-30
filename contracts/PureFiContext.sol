@@ -97,4 +97,8 @@ abstract contract PureFiContext is Initializable, ContextCompatible{
         _saveVerificationPackage(package);
     }
 
+    function _setVerifier( address _newVerifier ) internal {
+        pureFiVerifier = _newVerifier;
+    } 
+
 }
