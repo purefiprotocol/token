@@ -18,6 +18,8 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     //ACL
     //Manager is the person allowed to manage pools
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    uint256 public constant DEPOSIT_RULE = 631050090;
+
 
     // Info of each user.
     struct UserInfo {
@@ -262,7 +264,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
          uint256 _amount,
           address _beneficiary,
             bytes calldata _purefidata
-           ) public payable override whenNotPaused withDefaultAddressVerification(DefaultRule.AML, msg.sender, _purefidata) {
+           ) public payable override whenNotPaused withCustomAddressVerification(DEPOSIT_RULE, msg.sender, _purefidata) {
 
         _checkUserRegistration(_pid, _beneficiary);
 
