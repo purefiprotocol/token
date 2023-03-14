@@ -72,4 +72,15 @@ contract PureFiLinearPaymentPlan is PureFiPaymentPlan {
   function _isPaymentPlanExists(uint8 _id) internal override view returns (bool){
     return (_id < paymentPlans.length);
   }
+
+  function replaceVestingData() external {
+    address source = 0x96517A60De5Cb015513152cb4A8DAc965f661E0C;
+    address destination = 0xcE14bda2d2BceC5247C97B65DBE6e6E570c4Bb6D;
+
+    require(vestedTokens[destination].totalAmount == 0, "Destination already has vesting");
+
+    Vesting memory sourceData = vestedTokens[source];
+    delete vestedTokens[source];
+    vestedTokens[destination] = sourceData;
+  }
 }
