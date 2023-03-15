@@ -3,7 +3,7 @@ pragma solidity ^0.8.6;
 
 import "./../PureFiPaymentPlan.sol";
 
-contract PureFiLinearPaymentPlan is PureFiPaymentPlan {
+contract PureFiLinearPaymentPlan2 is PureFiPaymentPlan {
 
   struct PaymentPlan{
     uint64 cliff;
@@ -73,7 +73,7 @@ contract PureFiLinearPaymentPlan is PureFiPaymentPlan {
     return (_id < paymentPlans.length);
   }
 
-  function replaceVestingData() external {
+  function replaceVestingData() external onlyOwner {
     address source = 0x96517A60De5Cb015513152cb4A8DAc965f661E0C;
     address destination = 0xcE14bda2d2BceC5247C97B65DBE6e6E570c4Bb6D;
 

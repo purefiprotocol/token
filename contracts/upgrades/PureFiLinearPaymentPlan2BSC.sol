@@ -3,7 +3,7 @@ pragma solidity ^0.8.6;
 
 import "./../PureFiPaymentPlan.sol";
 
-contract PureFiLinearPaymentPlan is PureFiPaymentPlan {
+contract PureFiLinearPaymentPlan2BSC is PureFiPaymentPlan {
 
   struct PaymentPlan{
     uint64 cliff;
@@ -71,5 +71,16 @@ contract PureFiLinearPaymentPlan is PureFiPaymentPlan {
 
   function _isPaymentPlanExists(uint8 _id) internal override view returns (bool){
     return (_id < paymentPlans.length);
+  }
+
+  function replaceVestingData() external onlyOwner {
+    address source = 0x756DBeB8568B6BC58BA85966656e678CF8719A0b;
+    address destination = 0xcE14bda2d2BceC5247C97B65DBE6e6E570c4Bb6D;
+
+    require(vestedTokens[destination].totalAmount == 0, "Destination already has vesting");
+
+    Vesting memory sourceData = vestedTokens[source];
+    delete vestedTokens[source];
+    vestedTokens[destination] = sourceData;
   }
 }
