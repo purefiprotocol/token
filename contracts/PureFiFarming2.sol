@@ -18,6 +18,8 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     //ACL
     //Manager is the person allowed to manage pools
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    uint256 public constant DEPOSIT_RULE = 631050090;
+
 
     // Info of each user.
     struct UserInfo {
@@ -61,7 +63,9 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     // Info of each user that stakes LP tokens.
     mapping (uint16 => mapping (address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
-    uint256 public totalAllocPoint = 0;
+    uint256 public totalAllocPoint;
+     // Amount of users
+    uint256 usersAmount;
     // timestamp until claiming rewards are disabled;
     uint64 public noRewardClaimsUntil;
 
@@ -69,11 +73,21 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
     mapping (uint16 => uint64) public minStakingTimeForPool;
     mapping (uint16 => uint256) public maxStakingAmountForPool;
 
+    // PersonId to UserAddress 
+    mapping(uint => address) idToAddress;
+    // Accordance between user address and Id
+    mapping(address => uint) addressToId;
+    // Accordance between user and amount of deposited pools
+    mapping (address => uint16) addressToPools;
+
+
     // uint8 dexType; //1 for Uniswap v2, 2 for Pankcake v2
 
     uint32 private storageVersion;
 
     address public tokenBuyer;
+
+    // temporary storage for verification performing;
 
     event PoolAdded(uint256 indexed pid);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amountLiquidity);
@@ -107,9 +121,16 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         tokenBuyer = _tokenBuyer;
     }
 
+    /*
+        Changelog:
+        2000003 -> 2000004
+            * Add verification for deposit
+            * Add functionality for user identification
+    */
+
     function version() public pure returns (uint32){
         //version in format aaa.bbb.ccc => aaa*1E6+bbb*1E3+ccc;
-        return uint32(2000003);
+        return uint32(2000004);
     }
 
     function upgradeStorage() public {
@@ -232,19 +253,9 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         _updatePool(_pid);
     }
 
-    /**
-    * @param data - signed data package from the off-chain verifier
-    *    data[0] - verification session ID
-    *    data[1] - rule ID (if required)
-    *    data[2] - verification timestamp
-    *    data[3] - verified wallet - to be the same as msg.sender
-    * @param signature - Off-chain verifier signature
-    */
-
-
     // Deposit LP tokens to PureFiFarming for Token allocation.
-    function deposit(uint16 _pid, uint256 _amount, uint256[] memory data, bytes memory signature) public payable whenNotPaused {
-        depositTo(_pid, _amount, msg.sender, data, signature);
+    function deposit(uint16 _pid, uint256 _amount, bytes calldata _purefidata) public payable whenNotPaused {
+        depositTo(_pid, _amount, msg.sender, _purefidata);
     }
 
     // Deposit LP tokens to PureFiFarming for Token allocation.
@@ -252,10 +263,17 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         uint16 _pid,
          uint256 _amount,
           address _beneficiary,
-          uint256[] memory data,
-           bytes memory signature
-           ) public payable override whenNotPaused compliesDefaultRule( DefaultRule.KYCAML, msg.sender, data, signature ) {
+            bytes calldata _purefidata
+           ) public payable override whenNotPaused withCustomAddressVerification(DEPOSIT_RULE, msg.sender, _purefidata) {
+
+        _checkUserRegistration(_pid, _beneficiary);
+
         PoolInfo storage pool = poolInfo[_pid];
+        // validate received verificationData
+
+        require(getVerificationPackage().from == msg.sender, "PureFiFarming : Sender matching error");
+
+        
         UserInfo storage user = userInfo[_pid][_beneficiary];
         require(_amount + user.amount <= maxStakingAmountForPool[_pid], "Deposited amount exceeded limits for this pool");
         if(pool.commissionAmount > 0) {
@@ -287,12 +305,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
 
 
     // Withdraw LP tokens from PureFiFarming.
-    function withdraw(
-        uint16 _pid,
-         uint256 _amount,
-         uint256[] memory data,
-         bytes memory signature
-         ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+    function withdraw( uint16 _pid, uint256 _amount) public override whenNotPaused
     {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -307,15 +320,16 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
             emit Withdraw(msg.sender, _pid, _amount);
         }
         user.rewardDebt = user.amount * pool.accTokenPerShare / 1e12;   
+
+        // update info about user id and pools 
+        if ( user.amount == _amount ){
+            _updateUserIndex(msg.sender);
+        }
     }
 
     // Claim rewarded tokens from PureFiFarming.
-    // Claim rewarded tokens from PureFiFarming.
-    function claimReward(
-        uint16 _pid,
-         uint256[] memory data,
-          bytes memory signature
-          ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+
+    function claimReward( uint16 _pid ) public override whenNotPaused
     {
         require(block.timestamp >= noRewardClaimsUntil, "Claiming reward is not available yet");
         PoolInfo storage pool = poolInfo[_pid];
@@ -334,11 +348,7 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
 
     // withdraw all liquidity and claim all pending reward
     // withdraw all liquidity and claim all pending reward
-    function exit(
-        uint16 _pid,
-        uint256[] memory data,
-        bytes memory signature
-        ) public override whenNotPaused compliesDefaultRule(DefaultRule.KYC, msg.sender, data, signature)
+    function exit( uint16 _pid ) public override whenNotPaused
     {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -361,6 +371,10 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
             emit RewardClaimed(msg.sender, _pid, pending);
         }    
         user.rewardDebt = 0;   
+
+         // update info about user id and pools 
+        _updateUserIndex(msg.sender);
+    
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
@@ -373,6 +387,9 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         user.rewardDebt = 0;
         pool.lpToken.safeTransfer(address(msg.sender), amount);
         emit EmergencyWithdraw(msg.sender, _pid, amount);
+
+        // update info about user id and pools 
+        _updateUserIndex(msg.sender);
     }
 
     //************* VIEW FUNCTIONS ********************************
@@ -434,6 +451,22 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         return userStakedTime[_pid][_user];
     }
 
+    function getAddressById( uint256 _id ) external view returns (address){
+        return _getAddressById(_id);
+    }
+
+    function getAddressByIds( uint256[] memory _ids ) external view returns(address[] memory) {
+        address[] memory users = new address[](_ids.length);
+
+        for( uint i = 0; i < _ids.length; i++){
+            users[i] = idToAddress[_ids[i]];
+        }
+        return users;
+    }
+
+    function getUsersAmount() external view returns (uint256){
+        return usersAmount;
+    }
     //************* INTERNAL FUNCTIONS ********************************
 
     // Safe rewardToken transfer function, just in case if rounding error causes pool to not have enough Tokens.
@@ -468,4 +501,79 @@ contract PureFiFarming2 is Initializable, AccessControlUpgradeable, PausableUpgr
         pool.accTokenPerShare += amountRewardedPerPool * 1e12 / pool.totalDeposited;
         pool.lastRewardBlock = uint64(block.number);
     }
+
+    function _getAddressById( uint256 _id ) internal view returns (address){
+        return idToAddress[_id];
+    }
+
+    function _addUser( address _newUser ) internal {
+        usersAmount++;
+        uint256 index = usersAmount;
+        idToAddress[index] = _newUser;
+        addressToId[_newUser] = index;
+        addressToPools[_newUser] = 1;
+    }
+
+    function _addPool( address _user ) internal {
+        addressToPools[_user] += 1;
+    }
+
+    function _isRegistered( address _user ) internal view returns (bool){
+        if ( addressToId[_user] == 0 ){
+            return false;
+        }else{
+            return true;
+        }
+    }
+
+    function _checkUserRegistration( uint16 _pid, address _user ) internal{
+        UserInfo memory user = userInfo[_pid][_user];
+        // check if it is first deposit to this pool
+        if( user.amount == 0 ){
+            if( !_isRegistered(_user) ){
+                _addUser(_user);
+            }else{
+                _addPool(_user);
+            }
+        }
+    }
+
+    function _updateUserIndex( address _user ) internal{
+        if( addressToPools[_user] == 1 ){
+            _removeUser(_user);
+        }else{
+            _removePool(_user);
+        }
+    }
+
+    function _removeUser( address _user ) internal{
+        uint256 removedUserId = addressToId[_user];
+
+        _reorderId(removedUserId);
+
+        usersAmount -= 1;
+        delete addressToId[_user];
+        delete addressToPools[_user];
+        
+    }
+
+    function _removePool( address _user ) internal {
+        addressToPools[_user] -= 1;
+    }
+
+    function _lastUserIndex() internal view returns (uint256){
+        return usersAmount;
+    }
+
+    function _reorderId( uint256 _removedId ) internal {
+        if ( _removedId != _lastUserIndex()) {
+            address lastIndexUser = idToAddress[_lastUserIndex()];
+            idToAddress[_removedId] = lastIndexUser;
+            delete idToAddress[_lastUserIndex()];
+            addressToId[lastIndexUser] = _removedId;
+        }else{
+            delete idToAddress[_removedId];
+        }
+    }
+
 }
